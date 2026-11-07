@@ -1,0 +1,17 @@
+{
+  "name": "nishi-the-third-call",
+  "private": true,
+  "version": "0.1.0",
+  "description": "NISHI: THE THIRD CALL — browser-based first-person Indian supernatural survival horror.",
+  "type": "module",
+  "workspaces": ["packages/shared", "apps/client", "apps/server"],
+  "scripts": {
+    "dev": "npm run dev -w @nishi/client",
+    "dev:server": "npm run dev -w @nishi/server",
+    "build": "npm run build -w @nishi/client",
+    "start:server": "npm run start -w @nishi/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": { "node": ">=20.19" }
+}

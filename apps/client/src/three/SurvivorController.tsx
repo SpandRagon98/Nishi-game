@@ -1,0 +1,299 @@
+import { useFrame, useThree } from '@react-three/fiber';
+import { CapsuleCollider, RigidBody, useRapier, type RapierCollider, type RapierRigidBody } from '@react-three/rapier';
+import {
+  FLAG_CROUCH, FLAG_FLASHLIGHT, FLAG_MOVING, FLAG_SPRINT, OBJECTIVES, forwardFromYawPitch, survivorById, zoneAt,
+  type LevelDef, type Vec3,
+} from '@nishi/shared';
+import { useEffect, useMemo, useRef } from 'react';
+import * as THREE from 'three';
+import { audio } from '../audio/engine';
+import { fx, now } from '../game/fx';
+import { consumeMouse, isDown, matches } from '../game/input';
+import { runtime } from '../game/runtime';
+import type { GameSession } from '../game/session';
+import { findTarget, type Target } from '../game/targeting';
+import { app } from '../state/store';
+import { lightLevels } from './Lights';
+
+const HALF = 0.55;
+const RADIUS = 0.3;
+const CENTER = HALF + RADIUS; // body centre above the feet
+const EYE = 1.62;
+const EYE_CROUCH = 1.05;
+
+export function clockText(t: number) {
+  const secs = 3 * 3600 + 13 * 60 + t * 3; // 1 real second = 3 station seconds
+  const h = Math.floor(secs / 3600) % 24;
+  const m = Math.floor(secs / 60) % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+export function SurvivorController({ session, level, shadows }: { session: GameSession; level: LevelDef; shadows: boolean }) {
+  const body = useRef<RapierRigidBody>(null);
+  const collider = useRef<RapierCollider>(null);
+  const { world } = useRapier();
+  const camera = useThree((s) => s.camera);
+  const scene = useThree((s) => s.scene);
+
+  const ctrl = useMemo(() => {
+    const c = world.createCharacterController(0.03);
+    c.setUp({ x: 0, y: 1, z: 0 });
+    c.setMaxSlopeClimbAngle((55 * Math.PI) / 180);
+    c.setMinSlopeSlideAngle((65 * Math.PI) / 180);
+    c.enableAutostep(0.42, 0.12, false);
+    c.enableSnapToGround(0.45);
+    c.setSlideEnabled(true);
+    return c;
+  }, [world]);
+  useEffect(() => () => world.removeCharacterController(ctrl), [world, ctrl]);
+
+  const st = useRef({
+    yaw: -Math.PI / 2, pitch: 0, vy: 0, eye: EYE, flash: false, crouch: false, stride: 0, bob: 0,
+    lastHud: 0, target: null as Target | null, reviving: null as string | null, lastStep: 0, spawned: false,
+  });
+
+  // flashlight
+  const spot = useMemo(() => {
+    const s = new THREE.SpotLight('#ffe9c4', 0, 26, 0.42, 0.45, 1.6);
+    s.castShadow = shadows;
+    s.shadow.mapSize.set(1024, 1024);
+    s.shadow.bias = -0.0004;
+    s.shadow.camera.near = 0.2;
+    return s;
+  }, [shadows]);
+  useEffect(() => {
+    scene.add(spot, spot.target);
+    return () => {
+      scene.remove(spot, spot.target);
+      spot.dispose();
+    };
+  }, [scene, spot]);
+
+  // teleports from the authority (spawn, checkpoint, unhide, corrections)
+  useEffect(
+    () =>
+      session.onTeleport((p) => {
+        body.current?.setTranslation({ x: p.x, y: p.y + CENTER, z: p.z }, true);
+        body.current?.setNextKinematicTranslation({ x: p.x, y: p.y + CENTER, z: p.z });
+        st.current.vy = 0;
+      }),
+    [session],
+  );
+
+  // discrete actions
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const s = app();
+      if (s.overlay && s.overlay !== 'journal') return;
+      const snap = session.snapshot();
+      const me = snap?.survivors.find((x) => x.id === session.localId);
+      if (!me) return;
+      if (matches('interact', e.code)) {
+        if (me.hiding) return session.interact(me.hiding);
+        const t = st.current.target;
+        if (!t) return;
+        if (t.kind === 'revive') {
+          st.current.reviving = t.id;
+          session.revive(t.id);
+        } else session.interact(t.id);
+      } else if (matches('flashlight', e.code)) {
+        if (!me.hasFlashlight) return s.toast({ title: 'You have no flashlight yet.', tone: 'warn' }, 1500);
+        st.current.flash = !st.current.flash;
+        audio.sfx('locked');
+      } else if (matches('ability', e.code)) {
+        session.ability();
+      } else if (matches('journal', e.code)) {
+        s.setOverlay('journal');
+      } else if (matches('radio', e.code) && session.kind === 'multi') {
+        document.exitPointerLock();
+        s.setOverlay('chat');
+      }
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (matches('interact', e.code) && st.current.reviving) {
+        st.current.reviving = null;
+        session.revive(null);
+      }
+      if (matches('journal', e.code) && app().overlay === 'journal') app().setOverlay(null);
+    };
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    return () => {
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
+    };
+  }, [session]);
+
+  const tmpE = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), []);
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.05);
+    const s = st.current;
+    const snap = session.snapshot();
+    const me = snap?.survivors.find((x) => x.id === session.localId);
+    const b = body.current;
+    const col = collider.current;
+    if (!snap || !me || !b || !col) return;
+    const settings = app().settings;
+    const overlay = app().overlay;
+    const def = survivorById(me.characterId);
+
+    if (!s.spawned) {
+      s.spawned = true;
+      b.setTranslation({ x: me.pos.x, y: me.pos.y + CENTER, z: me.pos.z }, true);
+      s.yaw = me.yaw;
+    }
+
+    // look
+    const m = consumeMouse();
+    if (!overlay || overlay === 'journal') {
+      const k = 0.0021 * settings.mouseSensitivity;
+      s.yaw -= m.dx * k;
+      s.pitch -= m.dy * k * (settings.invertY ? -1 : 1);
+      s.pitch = Math.max(-1.45, Math.min(1.45, s.pitch));
+    }
+
+    const alive = me.status === 'alive';
+    const hiding = me.hiding ? level.hidingSpots.find((h) => h.id === me.hiding) : undefined;
+    const t = b.translation();
+    const feet: Vec3 = { x: t.x, y: t.y - CENTER, z: t.z };
+    let flags = 0;
+    let moving = false;
+    let sprinting = false;
+
+    if (hiding) {
+      // peek through the slats: limited look range around the spot's facing
+      const d = THREE.MathUtils.euclideanModulo(s.yaw - hiding.yaw + Math.PI, Math.PI * 2) - Math.PI;
+      s.yaw = hiding.yaw + Math.max(-0.7, Math.min(0.7, d));
+      s.pitch = Math.max(-0.5, Math.min(0.4, s.pitch));
+      s.flash = false;
+    } else if (alive && (!overlay || overlay === 'journal')) {
+      let ix = 0;
+      let iz = 0;
+      if (isDown('forward')) iz -= 1;
+      if (isDown('back')) iz += 1;
+      if (isDown('left')) ix -= 1;
+      if (isDown('right')) ix += 1;
+      const len = Math.hypot(ix, iz);
+      moving = len > 0;
+      s.crouch = isDown('crouch');
+      sprinting = moving && isDown('sprint') && !s.crouch && !me.exhausted && iz < 0;
+      const speed = s.crouch ? def.stats.crouch : sprinting ? def.stats.sprint : def.stats.walk;
+      const sin = Math.sin(s.yaw);
+      const cos = Math.cos(s.yaw);
+      const vx = len ? ((ix * cos + iz * sin) / len) * speed : 0;
+      const vz = len ? ((-ix * sin + iz * cos) / len) * speed : 0;
+      s.vy = Math.max(-20, s.vy - 9.81 * dt);
+      ctrl.computeColliderMovement(col, { x: vx * dt, y: s.vy * dt, z: vz * dt });
+      const mv = ctrl.computedMovement();
+      if (ctrl.computedGrounded() && s.vy < 0) s.vy = -0.5;
+      b.setNextKinematicTranslation({ x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z });
+      const horiz = Math.hypot(mv.x, mv.z);
+      s.stride += horiz;
+      s.bob += horiz * (sprinting ? 2.2 : 2.6);
+      const strideLen = s.crouch ? 0.55 : sprinting ? 1.0 : 0.72;
+      if (s.stride > strideLen) {
+        s.stride = 0;
+        const zone = zoneAt(level, feet);
+        audio.footstep(zone?.surface ?? 'concrete', feet, s.crouch ? 0.35 : sprinting ? 1.3 : 0.8);
+      }
+    }
+    if (!alive) s.flash = false;
+
+    if (moving) flags |= FLAG_MOVING;
+    if (sprinting) flags |= FLAG_SPRINT;
+    if (s.crouch) flags |= FLAG_CROUCH;
+    if (s.flash && me.hasFlashlight) flags |= FLAG_FLASHLIGHT;
+    session.sendMove({ x: feet.x, y: feet.y, z: feet.z, yaw: s.yaw, pitch: s.pitch, flags });
+
+    // camera
+    const targetEye = me.status === 'downed' ? 0.45 : s.crouch ? EYE_CROUCH : EYE;
+    s.eye += (targetEye - s.eye) * Math.min(1, dt * 10);
+    const bobAmt = settings.reducedShake ? 0.25 : 1;
+    const bobY = moving ? Math.sin(s.bob) * 0.035 * bobAmt : 0;
+    const shake = settings.reducedShake ? fx.shake * 0.2 : fx.shake;
+    fx.shake = Math.max(0, fx.shake - dt * 1.4);
+    if (hiding) camera.position.set(hiding.eye.x, hiding.eye.y, hiding.eye.z);
+    else camera.position.set(feet.x, feet.y + s.eye + bobY, feet.z);
+    camera.position.x += (Math.random() - 0.5) * shake * 0.06;
+    camera.position.y += (Math.random() - 0.5) * shake * 0.06;
+    tmpE.set(s.pitch, s.yaw, me.status === 'downed' ? 0.5 : moving ? Math.sin(s.bob * 0.5) * 0.004 * bobAmt : 0);
+    camera.quaternion.setFromEuler(tmpE);
+    runtime.eye = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+    const fwd = forwardFromYawPitch(s.yaw, s.pitch);
+    audio.setListener(runtime.eye, fwd);
+
+    // flashlight: follows the view with a little lag; stutters when the Caller is close
+    const g = snap.ghost;
+    const gd = Math.hypot(g.pos.x - feet.x, g.pos.y - feet.y, g.pos.z - feet.z);
+    const flashOn = s.flash && me.hasFlashlight;
+    const stutter = gd < 10 && (g.mode === 'hunt' || g.mode === 'warn') ? (Math.random() < 0.25 ? 0.15 : 1) : 1;
+    spot.intensity = flashOn ? 38 * stutter : 0;
+    spot.position.copy(camera.position).add(new THREE.Vector3(0.18, -0.2, 0).applyQuaternion(camera.quaternion));
+    spot.target.position.set(camera.position.x + fwd.x * 6, camera.position.y + fwd.y * 6, camera.position.z + fwd.z * 6);
+    spot.target.updateMatrixWorld();
+
+    // interaction target
+    s.target = alive && !hiding ? findTarget(level, snap, me, runtime.eye, fwd) : null;
+    if (s.reviving && (!s.target || s.target.id !== s.reviving)) {
+      session.revive(null);
+      s.reviving = null;
+    }
+
+    // ambience + HUD at ~10 Hz
+    const tn = now();
+    if (tn - s.lastHud > 0.1) {
+      s.lastHud = tn;
+      const zone = zoneAt(level, feet);
+      const signalRange = me.characterId === 'aditi' ? 24 : 17;
+      let hum = 0;
+      for (const l of level.lights) {
+        if (l.kind !== 'tube') continue;
+        const d = Math.hypot(l.pos.x - runtime.eye.x, l.pos.y - runtime.eye.y, l.pos.z - runtime.eye.z);
+        hum = Math.max(hum, (lightLevels.get(l.id) ?? 0) * Math.max(0, 1 - d / 9));
+      }
+      audio.updateAmbience({
+        indoor: !!zone?.indoor, underground: feet.y < -1.5, hum: hum * 0.9, ghostDist: gd,
+        hunting: g.mode === 'hunt' || g.mode === 'warn', signalRange,
+      });
+      const ability = def.ability;
+      const echo = fx.echoSense.until > tn
+        ? fx.echoSense.points.map((p) => {
+            const a = Math.atan2(-(p.pos.x - feet.x), -(p.pos.z - feet.z)) - s.yaw;
+            return { angle: Math.atan2(Math.sin(a), Math.cos(a)), kind: p.kind, dist: Math.hypot(p.pos.x - feet.x, p.pos.z - feet.z) };
+          })
+        : [];
+      const objective = OBJECTIVES.find((o) => !snap.world.objectives[o.id])?.id ?? null;
+      app().setHud({
+        prompt: hiding ? 'Leave the hiding place' : s.target?.label ?? null,
+        zone: zone?.name ?? '',
+        clock: clockText(snap.time),
+        stamina: me.stamina,
+        exhausted: me.exhausted,
+        flashlight: flashOn,
+        hasFlashlight: me.hasFlashlight,
+        abilityName: ability.name,
+        abilityLeft: Math.max(0, me.abilityReadyAt - snap.time),
+        abilityCooldown: ability.cooldown,
+        abilityActive: me.abilityActiveUntil > snap.time,
+        hiding: !!hiding,
+        status: me.status,
+        bleedout: me.bleedout,
+        reviveProgress: me.reviveProgress,
+        signal: Math.max(0, 1 - gd / signalRange),
+        objective,
+        echo,
+        teammates: snap.survivors.filter((x) => x.id !== me.id).map((x) => ({ id: x.id, name: x.name, status: x.status, characterId: x.characterId })),
+        ghost: null,
+        downedNearby: s.target?.kind === 'revive' ? s.target.id : null,
+      });
+    }
+  });
+
+  return (
+    <RigidBody ref={body} type="kinematicPosition" colliders={false} enabledRotations={[false, false, false]}>
+      <CapsuleCollider ref={collider} args={[HALF, RADIUS]} />
+    </RigidBody>
+  );
+}

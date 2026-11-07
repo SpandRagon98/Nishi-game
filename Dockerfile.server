@@ -1,0 +1,12 @@
+# Multiplayer game server (Colyseus). Build from the repository root:
+#   docker build -f Dockerfile.server -t nishi-server .
+FROM node:22-slim
+WORKDIR /app
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/shared packages/shared
+COPY apps/server apps/server
+COPY apps/client/package.json apps/client/package.json
+RUN npm ci --omit=dev --workspace @nishi/server --include-workspace-root=false && npm cache clean --force
+ENV PORT=2567 NODE_ENV=production
+EXPOSE 2567
+CMD ["npm", "run", "start", "-w", "@nishi/server"]
