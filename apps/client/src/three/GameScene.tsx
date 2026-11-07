@@ -7,7 +7,12 @@ import { lockPointer } from '../game/input';
 import { fx } from '../game/fx';
 import { runtime } from '../game/runtime';
 import type { GameSession } from '../game/session';
-import { graphicsProfile } from '../state/settings';
+import { graphicsProfile, type GraphicsProfile } from '../state/settings';
+import { audio } from '../audio/engine';
+import { music } from '../audio/music';
+import { usePerf } from '../perf/store';
+import { PerfGovernor } from './PerfGovernor';
+import { StaticBatch } from './StaticBatch';
 import { app, useApp } from '../state/store';
 import { Apparitions, GhostActor, RemoteSurvivors } from './Characters';
 import { Decor } from './Decor';
@@ -45,9 +50,7 @@ function SceneSetup() {
 }
 
 /** Everything visible about the station, shared by the menu backdrop and the game. */
-function StationWorld({ level, withPhysics }: { level: LevelDef; withPhysics: boolean }) {
-  const graphics = useApp((s) => s.settings.graphics);
-  const gp = graphicsProfile(graphics);
+function StationWorld({ level, withPhysics, gp }: { level: LevelDef; withPhysics: boolean; gp: GraphicsProfile }) {
   const lib = cachedTextures();
   const materials = useMemo(() => makeMaterials(lib ?? {}), [lib]);
   return (
@@ -55,13 +58,15 @@ function StationWorld({ level, withPhysics }: { level: LevelDef; withPhysics: bo
       <SceneSetup />
       <LevelMeshes level={level} materials={materials} shadows={gp.shadows} />
       {withPhysics && <LevelColliders level={level} />}
-      <Decor />
-      <LightRig level={level} pool={gp.lightPool} />
-      <StationArchitecture shadows={gp.shadows} />
-      <Train shadows={gp.shadows} />
-      <Props />
-      <MistBanks />
-      <DustMotes count={gp.rain > 3000 ? 1400 : 700} />
+      <StaticBatch>
+        <Decor />
+        <StationArchitecture shadows={gp.shadows} />
+        <Train shadows={gp.shadows} />
+        <Props lights={gp.propLights} />
+      </StaticBatch>
+      <LightRig level={level} pool={gp.lightPool} shafts={gp.shafts} />
+      <MistBanks density={gp.mist} />
+      {gp.dust > 0 && <DustMotes count={gp.dust} />}
       <Moon />
       <Horizon />
       {withPhysics && <Interactables level={level} materials={materials} />}
@@ -92,6 +97,14 @@ export function GameCanvas({ session }: { session: GameSession }) {
   const gp = graphicsProfile(graphics);
   const level = PLATFORM_ZERO;
   const ghost = session.role === 'ghost';
+  const degrade = usePerf((s) => s.degrade);
+
+  // in play the score falls silent: footsteps, breathing and wind carry the fear
+  useEffect(() => {
+    audio.setQuiet(true);
+    music.setMood('silent');
+    return () => audio.setQuiet(false);
+  }, []);
 
   useEffect(() => {
     const onLock = () => {
@@ -107,8 +120,8 @@ export function GameCanvas({ session }: { session: GameSession }) {
     <Canvas
       className="game-canvas"
       dpr={gp.dpr}
-      shadows={gp.shadows ? 'soft' : false}
-      gl={{ antialias: !gp.post, powerPreference: 'high-performance', toneMapping: THREE.ACESFilmicToneMapping }}
+      shadows={gp.shadows ? 'percentage' : false}
+      gl={{ antialias: false, powerPreference: 'high-performance', toneMapping: THREE.ACESFilmicToneMapping, stencil: false }}
       camera={{ fov: 72, near: 0.05, far: 420, position: [-21, 1.6, 4] }}
       onPointerDown={(e) => {
         if (!app().overlay && !document.pointerLockElement) lockPointer(e.target as HTMLCanvasElement);
@@ -116,7 +129,7 @@ export function GameCanvas({ session }: { session: GameSession }) {
     >
       <Suspense fallback={null}>
         <Physics gravity={[0, -9.81, 0]} timeStep="vary">
-          <StationWorld level={level} withPhysics />
+          <StationWorld level={level} withPhysics gp={gp} />
           {ghost ? <GhostController session={session} level={level} /> : <SurvivorController session={session} level={level} shadows={gp.shadows} />}
         </Physics>
         {!ghost && <GhostActor />}
@@ -124,7 +137,8 @@ export function GameCanvas({ session }: { session: GameSession }) {
         <Apparitions />
         <RemoteSurvivors localId={session.localId} ghostVision={ghost} />
         <GameLoop session={session} />
-        {gp.post && <Effects ghostVision={ghost} ao={gp.ao} />}
+        {gp.post && degrade < 2 && <Effects ghostVision={ghost} ao={gp.ao && degrade < 1} />}
+        <PerfGovernor profile={gp} />
       </Suspense>
     </Canvas>
   );
@@ -157,14 +171,15 @@ export function MenuCanvas() {
   return (
     <Canvas
       className="menu-canvas"
-      dpr={Math.min(gp.dpr, 1.25)}
-      gl={{ antialias: true, powerPreference: 'high-performance', toneMapping: THREE.ACESFilmicToneMapping }}
+      dpr={Math.min(gp.dpr, 1)}
+      gl={{ antialias: false, powerPreference: 'high-performance', toneMapping: THREE.ACESFilmicToneMapping, stencil: false }}
       camera={{ fov: 55, near: 0.05, far: 420 }}
     >
       <Suspense fallback={null}>
-        <StationWorld level={PLATFORM_ZERO} withPhysics={false} />
+        <StationWorld level={PLATFORM_ZERO} withPhysics={false} gp={gp} />
         <MenuCamera />
         {gp.post && <Effects ghostVision={false} />}
+        <PerfGovernor profile={gp} />
       </Suspense>
     </Canvas>
   );

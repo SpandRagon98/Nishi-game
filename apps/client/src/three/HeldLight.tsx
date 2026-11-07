@@ -12,111 +12,103 @@ export interface HeldState {
   hidden: boolean;
 }
 
-const beamMat = () =>
-  new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-    uniforms: { uI: { value: 0 } },
-    vertexShader: `varying float vH; varying float vEdge;
-      void main(){ vH = uv.y; vec4 mv = modelViewMatrix * vec4(position,1.0);
-        vec3 n = normalize(normalMatrix * normal); vEdge = abs(dot(n, normalize(-mv.xyz)));
-        gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `uniform float uI; varying float vH; varying float vEdge;
-      void main(){ float a = pow(vH, 1.6) * (0.35 + 0.65 * pow(vEdge, 2.0)) * 0.05 * uI; gl_FragColor = vec4(vec3(1.0, 0.95, 0.84) * a, a); }`,
-  });
+/** the phone's lock screen: 03:13, no signal, the torch toggle lit when the light is on */
+function screenTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 256;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const draw = (on: boolean) => {
+    const g = c.getContext('2d')!;
+    const grad = g.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0, '#0d1a1f');
+    grad.addColorStop(1, '#05080a');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 256);
+    g.fillStyle = 'rgba(210,225,228,0.85)';
+    g.font = '600 9px sans-serif';
+    g.fillText('No service', 8, 13);
+    g.fillRect(104, 6, 14, 7);
+    g.fillStyle = '#9b2a22';
+    g.fillRect(105, 7, 3, 5);
+    g.fillStyle = 'rgba(220,232,235,0.92)';
+    g.font = '300 34px sans-serif';
+    g.textAlign = 'center';
+    g.fillText('03:13', 64, 58);
+    g.font = '9px sans-serif';
+    g.fillStyle = 'rgba(200,215,218,0.6)';
+    g.fillText('3 missed calls · Unknown', 64, 74);
+    // torch toggle
+    g.beginPath();
+    g.arc(30, 226, 13, 0, Math.PI * 2);
+    g.fillStyle = on ? 'rgba(235,240,240,0.95)' : 'rgba(255,255,255,0.12)';
+    g.fill();
+    g.fillStyle = on ? '#111' : 'rgba(230,235,235,0.8)';
+    g.fillRect(27, 218, 6, 12);
+    g.fillRect(25, 215, 10, 4);
+    tex.needsUpdate = true;
+  };
+  draw(false);
+  return { tex, draw };
+}
 
 /**
- * First-person hand holding Aditi's phone torch or the station's metal flashlight.
- * Follows the camera with a little lag and sway so it feels hand-held, and draws its beam in the mist.
+ * Aditi's phone, held low at the bottom-right of the view: only its top edge and a sliver of the dim
+ * lock screen show. It sways with a soft lag so the torch light feels hand-held.
  */
-export function HeldLight({ state, skin }: { state: React.MutableRefObject<HeldState>; skin: string }) {
+export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> }) {
   const camera = useThree((s) => s.camera);
   const root = useRef<THREE.Group>(null);
-  const phone = useRef<THREE.Group>(null);
-  const torch = useRef<THREE.Group>(null);
-  const beam = useRef<THREE.Mesh>(null);
-  const lens = useRef<THREE.MeshStandardMaterial>(null);
   const led = useRef<THREE.MeshStandardMaterial>(null);
-  const bm = useMemo(beamMat, []);
+  const screen = useMemo(screenTexture, []);
+  const lastOn = useRef(false);
   const lag = useRef(new THREE.Quaternion());
   const t = useRef(0);
+  const sway = useRef(new THREE.Vector2());
   const offset = useMemo(() => new THREE.Vector3(), []);
 
-  useFrame((_, dt) => {
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.05);
     const s = state.current;
     const g = root.current;
     if (!g) return;
     g.visible = !s.hidden;
-    t.current += dt * (s.sprinting ? 11 : s.moving ? 7 : 1.4);
+    t.current += dt * (s.sprinting ? 9 : s.moving ? 6 : 1.2);
     const shake = app().settings.reducedShake ? 0.3 : 1;
-    const bobX = Math.sin(t.current) * (s.moving ? 0.012 : 0.003) * shake;
-    const bobY = Math.abs(Math.cos(t.current)) * (s.moving ? 0.014 : 0.003) * shake;
-    lag.current.slerp(camera.quaternion, Math.min(1, dt * 14));
+    const tx = Math.sin(t.current) * (s.moving ? 0.008 : 0.002) * shake;
+    const ty = Math.abs(Math.cos(t.current)) * (s.moving ? 0.01 : 0.002) * shake + (s.sprinting ? 0.03 : 0);
+    sway.current.x = THREE.MathUtils.damp(sway.current.x, tx, 10, dt);
+    sway.current.y = THREE.MathUtils.damp(sway.current.y, ty, 10, dt);
+    lag.current.slerp(camera.quaternion, 1 - Math.exp(-12 * dt));
     g.quaternion.copy(lag.current);
-    offset.set(0.27 + bobX, -0.3 - bobY - (s.sprinting ? 0.05 : 0), -0.5).applyQuaternion(camera.quaternion);
+    offset.set(0.2 + sway.current.x, -0.335 - sway.current.y, -0.42).applyQuaternion(camera.quaternion);
     g.position.copy(camera.position).add(offset);
-    if (phone.current) phone.current.visible = !s.strong;
-    if (torch.current) torch.current.visible = s.strong;
-    const k = s.on ? s.intensity : 0;
-    if (lens.current) lens.current.emissiveIntensity = k * 9;
-    if (led.current) led.current.emissiveIntensity = k * 14;
-    bm.uniforms.uI.value = k * (s.strong ? 1 : 0.5);
-    if (beam.current) beam.current.scale.set(s.strong ? 1 : 1.8, s.strong ? 1 : 0.55, s.strong ? 1 : 1.8);
+    if (led.current) led.current.emissiveIntensity = s.on ? 4 * s.intensity : 0;
+    if (s.on !== lastOn.current) {
+      lastOn.current = s.on;
+      screen.draw(s.on);
+    }
   });
 
   return (
-    <group ref={root} scale={0.85}>
-      {/* hand */}
-      <mesh position={[0.005, -0.03, 0.06]} rotation={[0.2, 0, 0.15]} scale={[0.85, 0.75, 1.15]}>
-        <sphereGeometry args={[0.055, 16, 12]} />
-        <meshStandardMaterial color={skin} roughness={0.65} />
-      </mesh>
-      <mesh position={[0.0, -0.05, 0.16]} rotation={[1.35, 0, 0.1]}>
-        <capsuleGeometry args={[0.032, 0.12, 4, 10]} />
-        <meshStandardMaterial color="#1a1c1f" roughness={0.9} />
-      </mesh>
-      {/* phone */}
-      <group ref={phone} rotation={[-Math.PI / 2 + 0.15, 0, 0]}>
+    <group ref={root}>
+      {/* tipped back a little, top edge towards the station */}
+      <group rotation={[-0.42, -0.12, 0.05]}>
         <mesh>
-          <boxGeometry args={[0.072, 0.012, 0.15]} />
-          <meshStandardMaterial color="#111316" roughness={0.3} metalness={0.4} />
+          <boxGeometry args={[0.072, 0.15, 0.0085]} />
+          <meshStandardMaterial color="#15171a" roughness={0.35} metalness={0.55} />
         </mesh>
-        <mesh position={[-0.02, 0.0065, -0.055]}>
-          <boxGeometry args={[0.022, 0.003, 0.03]} />
-          <meshStandardMaterial color="#050505" roughness={0.1} metalness={0.8} />
+        <mesh position={[0, 0, 0.0044]}>
+          <planeGeometry args={[0.066, 0.143]} />
+          <meshStandardMaterial map={screen.tex} emissiveMap={screen.tex} emissive="#ffffff" emissiveIntensity={0.22} roughness={0.15} metalness={0.1} />
         </mesh>
-        <mesh position={[-0.02, 0.0075, -0.062]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.005, 12]} />
-          <meshStandardMaterial ref={led} color="#fff" emissive="#fff6e8" emissiveIntensity={0} />
-        </mesh>
-      </group>
-      {/* metal flashlight */}
-      <group ref={torch} rotation={[Math.PI / 2, 0, 0]}>
-        <mesh position={[0, 0.04, 0]}>
-          <cylinderGeometry args={[0.019, 0.019, 0.2, 18]} />
-          <meshStandardMaterial color="#1b1c1e" metalness={0.75} roughness={0.38} />
-        </mesh>
-        {[0.0, 0.03, 0.06, 0.09].map((y) => (
-          <mesh key={y} position={[0, y, 0]}>
-            <torusGeometry args={[0.0195, 0.0025, 6, 18]} />
-            <meshStandardMaterial color="#0c0c0c" roughness={0.9} />
-          </mesh>
-        ))}
-        <mesh position={[0, -0.09, 0]}>
-          <cylinderGeometry args={[0.032, 0.021, 0.07, 20]} />
-          <meshStandardMaterial color="#26282b" metalness={0.8} roughness={0.3} />
-        </mesh>
-        <mesh position={[0, -0.126, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.029, 20]} />
-          <meshStandardMaterial ref={lens} color="#e8e4d8" emissive="#fff3dc" emissiveIntensity={0} roughness={0.1} />
+        {/* rear torch LED, visible as a glow on the top edge */}
+        <mesh position={[-0.024, 0.066, -0.0046]} rotation={[0, Math.PI, 0]}>
+          <circleGeometry args={[0.004, 10]} />
+          <meshStandardMaterial ref={led} color="#ffffff" emissive="#fff6e8" emissiveIntensity={0} />
         </mesh>
       </group>
-      {/* visible beam */}
-      <mesh ref={beam} material={bm} position={[0, 0, -4.1]} rotation={[Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[1.5, 8, 24, 1, true]} />
-      </mesh>
     </group>
   );
 }

@@ -15,6 +15,7 @@ import { intensityValue } from '../state/settings';
 import { useApp } from '../state/store';
 import { GameCanvas } from '../three/GameScene';
 import { Btn, Meter } from './common';
+import { usePerf } from '../perf/store';
 import { SettingsPanel } from './Screens';
 
 function useSnapshot(session: GameSession, ms = 120) {
@@ -123,6 +124,18 @@ function ChatFeed() {
       {recent.map((c) => (
         <div key={c.id}><b>{c.from}:</b> {c.text}</div>
       ))}
+    </div>
+  );
+}
+
+function FpsMeter() {
+  const show = useApp((s) => s.settings.showFps);
+  const p = usePerf();
+  if (!show) return null;
+  return (
+    <div className="fps-meter" aria-hidden>
+      <b className={p.fps >= 45 ? 'ok' : p.fps >= 30 ? 'mid' : 'bad'}>{p.fps} fps</b> · {p.worst} ms worst · {Math.round(p.dpr * 100)}% res · {p.calls} calls
+      {p.degrade > 0 && ` · ${p.degrade === 1 ? 'AO off' : 'post off'}`}
     </div>
   );
 }
@@ -608,6 +621,7 @@ export function GameView() {
       {!sceneReady && <div className="scene-cover"><span>Threading the tape…</span></div>}
       <GameCanvas key={session instanceof LocalSession ? session.sim.seed : session.localId} session={session} />
       {session.role === 'ghost' ? <GhostHud /> : <SurvivorHud />}
+      <FpsMeter />
       <ChatFeed />
       <Subtitles />
       <Toasts />

@@ -6,6 +6,7 @@ import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { profileRepository } from '../state/profile';
 import { DEFAULT_SETTINGS } from '../state/settings';
+import { detectDevice } from '../perf/device';
 import { useApp } from '../state/store';
 import { Humanoid, spectralMaterial, type AnimState } from '../three/Characters';
 import { Btn, ScreenFrame, Segmented, Slider, Toggle } from './common';
@@ -209,6 +210,7 @@ export function Unlocks() {
 
 export function SettingsPanel() {
   const s = useApp((st) => st.settings);
+  const autoTier = detectDevice().tier;
   const set = useApp((st) => st.setSettings);
   const profile = useApp((st) => st.profile);
   const updateProfile = useApp((st) => st.updateProfile);
@@ -227,15 +229,15 @@ export function SettingsPanel() {
       </section>
       <section className="panel">
         <h3>Graphics</h3>
-        <Segmented label="Preset" value={s.graphics} options={[{ v: 'low', l: 'Low' }, { v: 'medium', l: 'Medium' }, { v: 'high', l: 'High' }]} onChange={(v) => set({ graphics: v })} />
+        <Segmented label="Preset" value={s.graphics} options={[{ v: 'auto', l: `Auto (${autoTier})` }, { v: 'low', l: 'Low' }, { v: 'medium', l: 'Medium' }, { v: 'high', l: 'High' }]} onChange={(v) => set({ graphics: v })} />
         <Slider label="Brightness" value={s.brightness} min={0.6} max={1.8} onChange={(v) => set({ brightness: v })} format={(v) => v.toFixed(2)} />
         <Slider label="Field of view" value={s.fov} min={60} max={95} step={1} onChange={(v) => set({ fov: v })} format={(v) => `${v}°`} />
-        <p className="muted small">High enables flashlight shadows and more rain. Texture quality changes apply on the next load.</p>
+        <Toggle label="Show frame rate" hint="FPS, render scale and draw calls in the corner" value={s.showFps} onChange={(v) => set({ showFps: v })} />
+        <p className="muted small">Auto picks a profile for this device; in play, render resolution then adapts to hold 45–60 fps. High adds flashlight shadows and ambient occlusion. Texture quality changes apply on the next load.</p>
       </section>
       <section className="panel">
         <h3>Accessibility</h3>
         <Toggle label="Subtitles" value={s.subtitles} onChange={(v) => set({ subtitles: v })} />
-        <Toggle label="Reduced flashing" hint="Softens lightning and light flicker" value={s.reducedFlashing} onChange={(v) => set({ reducedFlashing: v })} />
         <Toggle label="Reduced camera shake" hint="Removes head-bob and scare shake" value={s.reducedShake} onChange={(v) => set({ reducedShake: v })} />
         <Segmented label="Horror intensity" value={s.intensity} options={[{ v: 'low', l: 'Low' }, { v: 'normal', l: 'Normal' }, { v: 'high', l: 'High' }]} onChange={(v) => set({ intensity: v })} />
         <p className="muted small">Intensity scales how often scares happen and how aggressive the Caller is. It applies from the next match.</p>

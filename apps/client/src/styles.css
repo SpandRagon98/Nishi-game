@@ -407,3 +407,7 @@ input[type='range'] { accent-color: var(--crimson-hi); width: 100%; }
 .lab-caption { position: absolute; top: 28px; left: 32px; z-index: 4; }
 .lab-actions, .lab .subtitle { position: relative; z-index: 4; }
 .lab-actions p { text-shadow: 0 2px 12px #000; }
+
+/* optional frame-rate readout */
+.fps-meter { position: absolute; right: 12px; top: 10px; z-index: 30; font-family: var(--mono); font-size: 11px; color: rgba(220,230,230,0.75); background: rgba(0,0,0,0.45); padding: 4px 8px; pointer-events: none; }
+.fps-meter b.ok { color: #7fd18b; } .fps-meter b.mid { color: #e2c26a; } .fps-meter b.bad { color: #e0695e; }

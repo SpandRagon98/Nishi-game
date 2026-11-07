@@ -7,7 +7,6 @@ import {
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { audio } from '../audio/engine';
-import { music } from '../audio/music';
 import { fx, now } from '../game/fx';
 import { consumeMouse, isDown, matches } from '../game/input';
 import { runtime } from '../game/runtime';
@@ -34,7 +33,7 @@ export function clockText(t: number) {
 export function SurvivorController({ session, level, shadows }: { session: GameSession; level: LevelDef; shadows: boolean }) {
   const body = useRef<RapierRigidBody>(null);
   const collider = useRef<RapierCollider>(null);
-  const { world } = useRapier();
+  const { world, rapier } = useRapier();
   const camera = useThree((s) => s.camera);
   const scene = useThree((s) => s.scene);
 
@@ -52,14 +51,16 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
 
   const st = useRef({
     yaw: -Math.PI / 2, pitch: 0, vy: 0, eye: EYE, flash: false, crouch: false, stride: 0, bob: 0,
-    lastHud: 0, target: null as Target | null, reviving: null as string | null, lastStep: 0, spawned: false, nextMoan: 0,
+    lastHud: 0, target: null as Target | null, reviving: null as string | null, lastStep: 0, spawned: false,
+    // smoothed torch: aim, brightness and the near-wall dimmer all ease so the light glides
+    aim: new THREE.Vector3(0, 0, -1), torchK: 0, wallK: 1, fear: 0,
   });
 
   // flashlight
   const spot = useMemo(() => {
     const s = new THREE.SpotLight('#ffe9c4', 0, 26, 0.42, 0.45, 1.6);
     s.castShadow = shadows;
-    s.shadow.mapSize.set(1024, 1024);
+    s.shadow.mapSize.set(512, 512);
     s.shadow.bias = -0.0004;
     s.shadow.camera.near = 0.2;
     return s;
@@ -129,7 +130,9 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
 
   const tmpE = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), []);
   const held = useRef({ on: false, strong: false, intensity: 1, moving: false, sprinting: false, hidden: false });
-  const skin = survivorById(session.snapshot()?.survivors.find((x) => x.id === session.localId)?.characterId ?? 'aditi').palette.skin;
+  const tmpV = useMemo(() => new THREE.Vector3(), []);
+  const ray = useMemo(() => new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -1 }), [rapier]);
+  useEffect(() => () => audio.setBreath(null), []);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -225,34 +228,58 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     fx.shake = Math.max(0, fx.shake - dt * 1.4);
     if (hiding) camera.position.set(hiding.eye.x, hiding.eye.y, hiding.eye.z);
     else camera.position.set(feet.x, feet.y + s.eye + bobY, feet.z);
-    camera.position.x += (Math.random() - 0.5) * shake * 0.06;
-    camera.position.y += (Math.random() - 0.5) * shake * 0.06;
+    // smooth tremor instead of per-frame random jitter
+    const tq = now();
+    camera.position.x += Math.sin(tq * 31.7) * Math.sin(tq * 12.3) * shake * 0.03;
+    camera.position.y += Math.sin(tq * 27.1 + 1.3) * Math.sin(tq * 9.7) * shake * 0.03;
     tmpE.set(s.pitch, s.yaw, me.status === 'downed' ? 0.5 : moving ? Math.sin(s.bob * 0.5) * 0.004 * bobAmt : 0);
     camera.quaternion.setFromEuler(tmpE);
     runtime.eye = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
     const fwd = forwardFromYawPitch(s.yaw, s.pitch);
     audio.setListener(runtime.eye, fwd);
 
-    // flashlight: follows the view with a little lag; stutters when the Caller is close
+    // torch: the aim trails the view slightly and every brightness change eases, so the pool of light
+    // glides across the walls instead of snapping or strobing
     const g = snap.ghost;
     const gd = Math.hypot(g.pos.x - feet.x, g.pos.y - feet.y, g.pos.z - feet.z);
-    // the found flashlight is a proper beam; before that, Aditi's phone torch
     const flashOn = s.flash;
+    // the found flashlight is a proper beam; before that, Aditi's phone torch
     const strong = me.hasFlashlight;
-    const stutter = gd < 10 && (g.mode === 'hunt' || g.mode === 'warn') ? (Math.random() < 0.25 ? 0.15 : 1) : 1;
-    spot.intensity = flashOn ? (strong ? 52 : 11) * stutter : 0;
-    spot.distance = strong ? 34 : 12;
-    spot.angle = strong ? 0.36 : 0.68;
-    spot.penumbra = strong ? 0.45 : 0.9;
-    spot.position.copy(camera.position).add(new THREE.Vector3(0.24, -0.26, -0.75).applyQuaternion(camera.quaternion));
-    spot.target.position.set(camera.position.x + fwd.x * 6, camera.position.y + fwd.y * 6, camera.position.z + fwd.z * 6);
+    const threatened = gd < 10 && (g.mode === 'hunt' || g.mode === 'warn');
+    s.torchK = THREE.MathUtils.damp(s.torchK, flashOn ? (threatened ? 0.35 : 1) : 0, flashOn ? 9 : 14, dt);
+    s.aim.lerp(tmpV.set(fwd.x, fwd.y, fwd.z), 1 - Math.exp(-16 * dt)).normalize();
+    spot.position.copy(camera.position).add(tmpV.set(0.2, -0.3, -0.45).applyQuaternion(camera.quaternion));
+    // close to a wall a real torch floods a small bright disc: dim it so the screen never whites out
+    if (flashOn) {
+      ray.origin = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+      ray.dir = { x: s.aim.x, y: s.aim.y, z: s.aim.z };
+      const hit = world.castRay(ray, 8, true, undefined, undefined, col, b);
+      const d = hit ? hit.timeOfImpact : 8;
+      s.wallK = THREE.MathUtils.damp(s.wallK, THREE.MathUtils.clamp((d - 0.3) / 3.2, 0.25, 1), 6, dt);
+    }
+    const k = s.torchK * s.wallK;
+    spot.intensity = (strong ? 30 : 9) * k;
+    spot.distance = strong ? 30 : 12;
+    spot.angle = strong ? 0.38 : 0.68;
+    spot.penumbra = strong ? 0.55 : 0.9;
+    spot.target.position.copy(spot.position).addScaledVector(s.aim, 6);
     spot.target.updateMatrixWorld();
-    torch.on = flashOn;
-    torch.strength = stutter * (strong ? 1 : 0.45);
+    torch.on = s.torchK > 0.02;
+    torch.strength = k * (strong ? 1 : 0.45);
     torch.pos.copy(spot.position);
-    torch.dir.set(fwd.x, fwd.y, fwd.z);
+    torch.dir.copy(s.aim);
     torch.cos = Math.cos(strong ? 0.3 : 0.55);
-    held.current = { on: flashOn, strong, intensity: stutter, moving, sprinting, hidden: !!hiding || !alive };
+    held.current = { on: flashOn, strong, intensity: s.torchK, moving, sprinting, hidden: !!hiding || !alive };
+
+    // breathing: slow and cold at rest, quicker when moving, ragged when hunted or spent
+    s.fear = THREE.MathUtils.damp(s.fear, threatened ? 1 : gd < 14 ? 0.45 : 0, 1.2, dt);
+    audio.setBreath({
+      exertion: sprinting ? 1 : me.exhausted ? 0.9 : moving ? (s.crouch ? 0.15 : 0.35) : 0,
+      fear: s.fear,
+      hiding: !!hiding,
+      down: me.status === 'downed',
+      voice: me.characterId === 'kabir' ? 'man' : 'woman',
+    });
 
     // interaction target
     s.target = alive && !hiding ? findTarget(level, snap, me, runtime.eye, fwd) : null;
@@ -277,13 +304,6 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
         indoor: !!zone?.indoor, underground: feet.y < -1.5, hum: hum * 0.9, ghostDist: gd,
         hunting: g.mode === 'hunt' || g.mode === 'warn', signalRange,
       });
-      const hunting = g.mode === 'hunt' || g.mode === 'warn' || g.mode === 'stunned';
-      music.setMood(snap.ended ? 'silent' : hunting ? 'hunt' : gd < signalRange * 0.75 ? 'tension' : 'explore');
-      // something breathing just out of sight
-      if (!hunting && gd < 14 && tn > s.nextMoan) {
-        s.nextMoan = tn + 9 + Math.random() * 10;
-        audio.moan({ x: g.pos.x, y: g.pos.y + 1.6, z: g.pos.z }, 0.18);
-      }
       const ability = def.ability;
       const echo = fx.echoSense.until > tn
         ? fx.echoSense.points.map((p) => {
@@ -323,7 +343,7 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
       <RigidBody ref={body} type="kinematicPosition" colliders={false} enabledRotations={[false, false, false]}>
         <CapsuleCollider ref={collider} args={[HALF, RADIUS]} />
       </RigidBody>
-      <HeldLight state={held} skin={skin} />
+      <HeldLight state={held} />
     </>
   );
 }

@@ -4,6 +4,18 @@ import type { SfxId, Surface, Vec3 } from '@nishi/shared';
  * Procedural Web Audio engine. Every sound in the game is synthesised at runtime — no recorded or
  * licensed samples are required. Buses: master → { ambience, dialogue, effects }.
  */
+export interface BreathState {
+  /** 0 standing still … 1 sprinting */
+  exertion: number;
+  /** 0 calm … 1 the Caller is hunting close by */
+  fear: number;
+  hiding: boolean;
+  down: boolean;
+  voice: 'woman' | 'man';
+}
+
+const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
+
 class AudioEngine {
   ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -24,6 +36,11 @@ class AudioEngine {
   private ambienceRunning = false;
   private envState = { indoor: false, underground: false, menu: true };
   private timers: number[] = [];
+  /** gameplay mix: only footsteps, the player's breathing and a low wind */
+  private quiet = false;
+  private breath: BreathState | null = null;
+  private breathTimer = 0;
+  private breathEffort = 0;
 
   /** Must be called from a user gesture. Safe to call repeatedly. */
   unlock() {
@@ -290,11 +307,11 @@ class AudioEngine {
 
     // sparse random events
     this.every(2, 6, () => this.windGust());
-    this.every(7, 22, () => !this.envState.underground && this.honk());
-    this.every(1.5, 5, () => !this.envState.indoor && !this.envState.underground && this.crickets());
-    this.every(0.6, 3.5, () => (this.envState.underground || Math.random() < 0.3) && this.drip());
-    this.every(60, 140, () => this.trainHorn());
-    this.every(30, 75, () => !this.envState.underground && this.dogHowl());
+    this.every(7, 22, () => !this.quiet && !this.envState.underground && this.honk());
+    this.every(1.5, 5, () => !this.quiet && !this.envState.indoor && !this.envState.underground && this.crickets());
+    this.every(0.6, 3.5, () => !this.quiet && (this.envState.underground || Math.random() < 0.3) && this.drip());
+    this.every(60, 140, () => !this.quiet && this.trainHorn());
+    this.every(30, 75, () => !this.quiet && !this.envState.underground && this.dogHowl());
   }
 
   private every(min: number, max: number, fn: () => unknown) {
@@ -315,6 +332,15 @@ class AudioEngine {
     if (!this.ctx || !this.night) return;
     this.envState = { indoor: p.indoor, underground: p.underground, menu: !!p.menu };
     const t = this.ctx.currentTime;
+    if (this.quiet && !p.menu) {
+      // near silence: a low wind through the shed and nothing else
+      this.night.wind.gain.setTargetAtTime(p.underground ? 0.035 : p.indoor ? 0.07 : 0.11, t, 1.2);
+      this.night.city.gain.setTargetAtTime(0, t, 1);
+      this.hum!.gain.setTargetAtTime(0, t, 0.5);
+      this.drone!.gain.gain.setTargetAtTime(0, t, 0.5);
+      this.staticBed!.gain.setTargetAtTime(0, t, 0.2);
+      return;
+    }
     this.night.wind.gain.setTargetAtTime(p.underground ? 0.05 : p.indoor ? 0.14 : 0.26, t, 0.6);
     this.night.city.gain.setTargetAtTime(p.underground ? 0.03 : p.indoor ? 0.1 : 0.18, t, 0.6);
     this.hum!.gain.setTargetAtTime(p.hum, t, 0.2);
@@ -343,7 +369,9 @@ class AudioEngine {
     if (!this.night || !this.ctx) return;
     const t = this.ctx.currentTime;
     const n = this.night;
-    const peak = this.envState.underground ? 0.02 : 0.05 + Math.random() * 0.07;
+    const peak = this.quiet
+      ? (this.envState.underground ? 0.01 : 0.018 + Math.random() * 0.03)
+      : this.envState.underground ? 0.02 : 0.05 + Math.random() * 0.07;
     n.whistle.gain.cancelScheduledValues(t);
     n.whistle.gain.setTargetAtTime(peak, t, 0.8);
     n.whistle.gain.setTargetAtTime(0, t + 1.5 + Math.random() * 2, 1.2);
@@ -916,9 +944,11 @@ class AudioEngine {
         this.sfx('creak', pos);
         break;
       case 'scream_distant':
+        if (this.quiet) break;
         this.scream(Math.random() < 0.7 ? 'woman' : 'man', pos, 0.22);
         break;
       case 'train_horn':
+        if (this.quiet) break;
         this.trainHorn(true);
         break;
       case 'paper':
@@ -989,6 +1019,104 @@ class AudioEngine {
       tick();
       this.loops.set(key, { stop: () => (alive = false) });
     }
+  }
+
+  // ───────────────────────────── quiet mix + breathing ─────────────────────────────
+
+  /** Gameplay mixes down to footsteps, breathing and wind; menus and cutscenes keep the full bed. */
+  setQuiet(on: boolean) {
+    this.quiet = on;
+  }
+
+  /** Called every frame from the survivor controller; null stops the breathing. */
+  setBreath(p: BreathState | null) {
+    this.breath = p;
+    if (!p) {
+      window.clearTimeout(this.breathTimer);
+      this.breathTimer = 0;
+      this.breathEffort = 0;
+      return;
+    }
+    if (!this.breathTimer && this.ctx) this.breathTimer = window.setTimeout(() => this.nextBreath(), 600);
+  }
+
+  private nextBreath() {
+    const p = this.breath;
+    if (!p || !this.ctx) {
+      this.breathTimer = 0;
+      return;
+    }
+    // effort rises quickly and settles slowly, so breathing stays heavy for a while after a sprint
+    const target = Math.max(p.exertion, p.down ? 0.75 : 0, p.fear * 0.55);
+    this.breathEffort += (target - this.breathEffort) * (target > this.breathEffort ? 0.55 : 0.16);
+    const e = this.breathEffort;
+    const inhale = lerp(1.45, 0.5, e);
+    const exhale = lerp(2.1, 0.62, e);
+    // hiding: shallow, held breaths with long gaps
+    const pause = p.hiding ? 2.4 + Math.random() : lerp(1.8, 0.06, e) + Math.random() * 0.25;
+    const loud = (p.hiding ? 0.4 : 1) * lerp(0.06, 0.15, e);
+    if (!document.hidden) this.breathe(inhale, exhale, loud, p.fear, p.voice);
+    this.breathTimer = window.setTimeout(() => this.nextBreath(), (inhale + exhale + pause) * 1000);
+  }
+
+  /** One breath of cold night air: a narrow hiss drawn in, a lower, shaky sigh out. */
+  private breathe(inh: number, exh: number, loud: number, fear: number, voice: 'woman' | 'man') {
+    const ctx = this.ctx!;
+    const dest = this.buses.effects;
+    const k = voice === 'man' ? 0.8 : 1;
+    const t = ctx.currentTime + 0.02;
+
+    const inSrc = this.noiseSrc(true);
+    const inHp = ctx.createBiquadFilter();
+    inHp.type = 'highpass';
+    inHp.frequency.value = 380;
+    const inBp = ctx.createBiquadFilter();
+    inBp.type = 'bandpass';
+    inBp.Q.value = 1.2;
+    inBp.frequency.setValueAtTime(950 * k, t);
+    inBp.frequency.linearRampToValueAtTime(1550 * k, t + inh);
+    const inG = ctx.createGain();
+    inG.gain.setValueAtTime(0, t);
+    inG.gain.linearRampToValueAtTime(loud * 0.65, t + inh * 0.6);
+    inG.gain.linearRampToValueAtTime(0, t + inh);
+    inSrc.connect(inHp).connect(inBp).connect(inG).connect(dest);
+    inSrc.start(t, Math.random() * 1.5);
+    inSrc.stop(t + inh + 0.05);
+
+    const t2 = t + inh + 0.05;
+    const exSrc = this.noiseSrc(true);
+    const body = ctx.createBiquadFilter();
+    body.type = 'bandpass';
+    body.Q.value = 0.8;
+    body.frequency.setValueAtTime(700 * k, t2);
+    body.frequency.linearRampToValueAtTime(430 * k, t2 + exh);
+    // a faint "hhh" vowel colour on top
+    const vowel = ctx.createBiquadFilter();
+    vowel.type = 'bandpass';
+    vowel.Q.value = 5;
+    vowel.frequency.value = 1350 * k;
+    const vowelG = ctx.createGain();
+    vowelG.gain.value = 0.35;
+    const exG = ctx.createGain();
+    exG.gain.setValueAtTime(0, t2);
+    exG.gain.linearRampToValueAtTime(loud, t2 + Math.min(0.18, exh * 0.2));
+    exG.gain.setTargetAtTime(0, t2 + exh * 0.35, exh * 0.25);
+    // the cold makes the out-breath shiver
+    const shiver = ctx.createGain();
+    const depth = 0.12 + fear * 0.25;
+    shiver.gain.value = 1 - depth;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 5.5 + fear * 4 + Math.random();
+    const lfoG = ctx.createGain();
+    lfoG.gain.value = depth;
+    lfo.connect(lfoG).connect(shiver.gain);
+    exSrc.connect(body).connect(exG);
+    exSrc.connect(vowel).connect(vowelG).connect(exG);
+    exG.connect(shiver).connect(dest);
+    exSrc.start(t2, Math.random() * 1.5);
+    exSrc.stop(t2 + exh + 0.3);
+    lfo.start(t2);
+    lfo.stop(t2 + exh + 0.3);
   }
 
   stopAllLoops() {

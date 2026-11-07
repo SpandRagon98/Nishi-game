@@ -340,11 +340,10 @@ function Cab({ shadows, mats, body }: { shadows: boolean; mats: Record<string, T
     const s = new THREE.SpotLight('#e9f2ff', 170, 80, 0.28, 0.6, 1.6);
     s.position.set(-13.5, 2.98, Z);
     s.target.position.set(-50, 0.1, 8.8);
-    s.castShadow = shadows;
-    s.shadow.mapSize.set(1024, 1024);
-    s.shadow.bias = -0.0005;
+    // a second shadow map would re-render the whole station every frame; the torch casts the only shadows
+    s.castShadow = false;
     return s;
-  }, [shadows]);
+  }, []);
   useEffect(() => {
     scene.add(spot, spot.target);
     return () => {
@@ -352,19 +351,21 @@ function Cab({ shadows, mats, body }: { shadows: boolean; mats: Record<string, T
       spot.dispose();
     };
   }, [scene, spot]);
-  useFrame(() => {
+  const level = useRef(0.92);
+  useFrame((_, dt) => {
     const t = now();
-    let k = 0.92 + Math.sin(t * 2.1) * 0.03;
+    // the headlamp sags (never strobes) when the Caller hunts nearby or the platform browns out
+    let target = 0.92 + Math.sin(t * 0.6) * 0.03;
     const g = runtime.snap?.ghost;
-    if (g && (g.mode === 'hunt' || g.mode === 'warn') && Math.hypot(g.pos.x + 12.7, g.pos.z - Z) < 28) {
-      k = Math.sin(t * 43) * Math.sin(t * 7.1) > 0.1 ? 1 : 0.04;
-    }
-    if ((fx.flicker.get('l_plat_flicker') ?? 0) > t) k *= Math.random() > 0.5 ? 1 : 0.25;
-    spot.intensity = 170 * k;
-    beam.uniforms.uI.value = k;
-    if (lamp.current) lamp.current.emissiveIntensity = 16 * k;
-    glare.opacity = k;
-    glareRef.current?.scale.setScalar(2.6 * (0.6 + 0.4 * k));
+    if (g && (g.mode === 'hunt' || g.mode === 'warn') && Math.hypot(g.pos.x + 12.7, g.pos.z - Z) < 28) target = 0.3;
+    if ((fx.flicker.get('l_plat_flicker') ?? 0) > t) target *= 0.5;
+    level.current = THREE.MathUtils.damp(level.current, target, 1.6, Math.min(dt, 0.1));
+    const k = level.current;
+    spot.intensity = 150 * k;
+    beam.uniforms.uI.value = k * 0.8;
+    if (lamp.current) lamp.current.emissiveIntensity = 12 * k;
+    glare.opacity = 0.55 * k;
+    glareRef.current?.scale.setScalar(2.1 * (0.6 + 0.4 * k));
   });
   const x = -12;
   const beamLen = 30;
@@ -469,8 +470,7 @@ function Coach({ c, mats, shadows }: { c: CoachSpec; mats: Record<string, THREE.
   useFrame(() => {
     if (!glow.current) return;
     const t = now();
-    const n = Math.sin(t * 13) * Math.sin(t * 5.3) * Math.sin(t * 0.7);
-    glow.current.emissiveIntensity = n > 0.25 ? 0.05 : 0.9 + Math.sin(t * 50) * 0.1;
+    glow.current.emissiveIntensity = 0.75 + Math.sin(t * 0.4) * 0.12;
   });
   const roofH = 0.34;
   return (

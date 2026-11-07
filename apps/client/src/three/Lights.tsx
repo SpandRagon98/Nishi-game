@@ -4,8 +4,8 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { fx, now } from '../game/fx';
 import { runtime } from '../game/runtime';
-import { app } from '../state/store';
 import { MOON_DIR } from './Atmosphere';
+import { StaticBatch } from './StaticBatch';
 
 /** current brightness factor (0..1+) of every level light, shared with other scene parts */
 export const lightLevels = new Map<string, number>();
@@ -29,35 +29,30 @@ function halo() {
   return haloTex;
 }
 
-function chronic(def: LightDef, t: number, reduced: boolean) {
+/** faulty tubes breathe slowly and sag now and then; nothing strobes */
+function chronic(def: LightDef, t: number) {
   const f = def.faulty ?? 0;
   if (!f) return 1;
   const seed = def.id.length * 17.3 + def.pos.x;
-  const n = Math.sin(t * 9.1 + seed) * Math.sin(t * 3.7 + seed * 1.7) * Math.sin(t * 0.9 + seed * 0.3);
-  if (n > 1 - f * 0.35) return reduced ? 0.55 : 0.08 + Math.random() * 0.15;
-  return 1 - f * 0.15 * (0.5 + 0.5 * Math.sin(t * 50 + seed));
+  const slow = Math.sin(t * 0.7 + seed) * Math.sin(t * 0.23 + seed * 1.7);
+  return 1 - f * (0.18 + 0.32 * Math.max(0, slow));
 }
 
-export function computeLightLevel(def: LightDef, t: number, reduced: boolean): number {
+/** target brightness of a level light; the rig eases towards it so every change is a fade */
+export function computeLightLevel(def: LightDef, t: number): number {
   const snap = runtime.snap;
   const power = runtime.menu ? false : !!snap?.world.power;
   if (def.circuit === 'main' && !power) return 0;
   if (snap && (snap.world.lightsOff[def.id] ?? 0) > snap.time) return 0;
-  let f = chronic(def, t, reduced);
+  let f = chronic(def, t);
+  // a director "flicker" is a slow brown-out, not a strobe
   const forced = fx.flicker.get(def.id);
-  if (forced && forced > t) {
-    if (reduced) f *= 0.45 + 0.15 * Math.sin(t * 6);
-    else f *= Math.sin(t * 37 + def.pos.z) * Math.sin(t * 11.3) > 0 ? 1 : 0.04;
-  }
-  if (def.circuit === 'main' && fx.powerOnAt && t - fx.powerOnAt < 2.5) {
-    const k = (t - fx.powerOnAt) / 2.5;
-    f *= reduced ? k : Math.random() < k ? 1 : 0.05;
-  }
+  if (forced && forced > t) f *= 0.3;
   // the Caller drains light near it while hunting
   const g = snap?.ghost;
   if (g && (g.mode === 'hunt' || g.mode === 'warn')) {
     const d = Math.hypot(g.pos.x - def.pos.x, g.pos.z - def.pos.z, (g.pos.y - def.pos.y) * 0.5);
-    if (d < 9) f *= 0.25 + (d / 9) * 0.75;
+    if (d < 9) f *= 0.3 + (d / 9) * 0.7;
   }
   return f;
 }
@@ -87,7 +82,7 @@ const coneMaterial = () =>
       }`,
   });
 
-function Fixture({ def }: { def: LightDef }) {
+function Fixture({ def, shafts }: { def: LightDef; shafts: boolean }) {
   const tubeMat = useMemo(
     () => new THREE.MeshStandardMaterial({ color: '#2a2a28', emissive: new THREE.Color(def.color), emissiveIntensity: 0, roughness: 0.4 }),
     [def.color],
@@ -98,12 +93,12 @@ function Fixture({ def }: { def: LightDef }) {
     [def.color],
   );
   const indoor = def.pos.y < 4.5;
-  const coneH = def.kind === 'tube' ? (def.pos.y < 0 ? 2.8 : indoor ? 3.8 : 4.6) : def.kind === 'bulb' ? 3.2 : 0;
+  const coneH = !shafts ? 0 : def.kind === 'tube' ? (def.pos.y < 0 ? 2.8 : indoor ? 3.8 : 4.6) : def.kind === 'bulb' ? 3.2 : 0;
   useFrame(() => {
     const lv = lightLevels.get(def.id) ?? 0;
     tubeMat.emissiveIntensity = lv * (def.kind === 'lamp' ? 6 : def.kind === 'lantern' ? 8 : 3.2);
     cone.uniforms.uOpacity.value = lv * (def.kind === 'tube' ? 0.07 : 0.05);
-    haloMat.opacity = Math.min(1, lv) * (def.kind === 'lamp' ? 0.5 : def.kind === 'sign' ? 0.25 : 0.42);
+    haloMat.opacity = Math.min(1, lv) * (def.kind === 'lamp' ? 0.35 : def.kind === 'sign' ? 0.18 : 0.28);
     (cone.uniforms.uColor.value as THREE.Color).set(def.color);
   });
   return (
@@ -153,7 +148,7 @@ function Fixture({ def }: { def: LightDef }) {
           </mesh>
         </>
       )}
-      <sprite material={haloMat} scale={def.kind === 'tube' ? [2.6, 1.3, 1] : def.kind === 'sign' ? [3, 1.6, 1] : [1.7, 1.7, 1]} />
+      {shafts && <sprite material={haloMat} scale={def.kind === 'tube' ? [2.6, 1.3, 1] : def.kind === 'sign' ? [3, 1.6, 1] : [1.7, 1.7, 1]} />}
       {def.kind === 'lamp' && (
         <mesh material={tubeMat}>
           <sphereGeometry args={[0.05, 10, 8]} />
@@ -168,35 +163,68 @@ function Fixture({ def }: { def: LightDef }) {
   );
 }
 
-export function LightRig({ level, pool }: { level: LevelDef; pool: number }) {
+interface Slot {
+  id: string | null;
+  /** crossfade weight: a slot fades out before it moves to another fixture, then fades back in */
+  w: number;
+}
+
+export function LightRig({ level, pool, shafts = true }: { level: LevelDef; pool: number; shafts?: boolean }) {
   const refs = useRef<(THREE.PointLight | null)[]>([]);
-  const assigned = useRef<string[]>([]);
+  const slots = useRef<Slot[]>([]);
+  const wanted = useRef<string[]>([]);
   const lastAssign = useRef(0);
   const hemi = useRef<THREE.HemisphereLight>(null);
   const moon = useRef<THREE.DirectionalLight>(null);
   const byId = useMemo(() => new Map(level.lights.map((l) => [l.id, l])), [level]);
+  if (slots.current.length !== pool) slots.current = Array.from({ length: pool }, () => ({ id: null, w: 0 }));
 
-  useFrame(() => {
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1);
     const t = now();
-    const reduced = app().settings.reducedFlashing;
     const under = runtime.eye.y < -1.5;
-    if (hemi.current) hemi.current.intensity = under ? 0.03 : 0.07;
-    if (moon.current) moon.current.intensity = under ? 0 : 0.28;
-    for (const l of level.lights) lightLevels.set(l.id, computeLightLevel(l, t, reduced));
+    if (hemi.current) hemi.current.intensity = THREE.MathUtils.damp(hemi.current.intensity, under ? 0.03 : 0.07, 2, dt);
+    if (moon.current) moon.current.intensity = THREE.MathUtils.damp(moon.current.intensity, under ? 0 : 0.28, 2, dt);
+    // ease every light towards its target so power cuts, brown-outs and the Caller's drain all fade
+    for (const l of level.lights) {
+      const target = computeLightLevel(l, t);
+      const cur = lightLevels.get(l.id) ?? target;
+      const rate = target > cur ? 2.2 : 3.5;
+      lightLevels.set(l.id, THREE.MathUtils.damp(cur, target, rate, dt));
+    }
 
-    if (t - lastAssign.current > 0.2) {
+    if (t - lastAssign.current > 0.25) {
       lastAssign.current = t;
       const e = runtime.eye;
-      assigned.current = level.lights
-        .filter((l) => (lightLevels.get(l.id) ?? 0) > 0 || l.circuit === 'emergency')
+      wanted.current = level.lights
+        .filter((l) => (lightLevels.get(l.id) ?? 0) > 0.02 || l.circuit === 'emergency')
         .map((l) => ({ id: l.id, d: (l.pos.x - e.x) ** 2 + ((l.pos.y - e.y) * 2) ** 2 + (l.pos.z - e.z) ** 2 }))
         .sort((a, b) => a.d - b.d)
-        .slice(0, pool)
+        // one spare so a fixture right on the edge of the set doesn't swap back and forth
+        .slice(0, pool + 1)
         .map((x) => x.id);
     }
+    const want = wanted.current;
+    const core = new Set(want.slice(0, pool));
+    const keep = new Set(want);
+    const held = new Set(slots.current.map((s) => s.id));
+    for (const slot of slots.current) {
+      const stale = !slot.id || !keep.has(slot.id);
+      if (stale) {
+        slot.w = Math.max(0, slot.w - dt * 2.5);
+        if (slot.w === 0) {
+          // free: take the nearest wanted fixture nobody is lighting yet
+          const next = want.find((id) => core.has(id) && !held.has(id)) ?? null;
+          if (slot.id) held.delete(slot.id);
+          slot.id = next;
+          if (next) held.add(next);
+        }
+      } else slot.w = Math.min(1, slot.w + dt * 2.5);
+    }
     refs.current.forEach((pl, i) => {
-      if (!pl) return;
-      const def = byId.get(assigned.current[i]);
+      const slot = slots.current[i];
+      if (!pl || !slot) return;
+      const def = slot.id ? byId.get(slot.id) : undefined;
       if (!def) {
         pl.intensity = 0;
         return;
@@ -204,9 +232,9 @@ export function LightRig({ level, pool }: { level: LevelDef; pool: number }) {
       pl.position.set(def.pos.x, def.pos.y - 0.15, def.pos.z);
       pl.color.set(def.color);
       pl.distance = def.distance;
-      pl.intensity = def.intensity * LIGHT_SCALE * (lightLevels.get(def.id) ?? 0);
+      const ease = slot.w * slot.w * (3 - 2 * slot.w);
+      pl.intensity = def.intensity * LIGHT_SCALE * (lightLevels.get(def.id) ?? 0) * ease;
     });
-
   });
 
   return (
@@ -218,9 +246,11 @@ export function LightRig({ level, pool }: { level: LevelDef; pool: number }) {
             refs.current[i] = el;
           }} decay={2} intensity={0} />
       ))}
-      {level.lights.map((l) => (
-        <Fixture key={l.id} def={l} />
-      ))}
+      <StaticBatch>
+        {level.lights.map((l) => (
+          <Fixture key={l.id} def={l} shafts={shafts} />
+        ))}
+      </StaticBatch>
     </>
   );
 }

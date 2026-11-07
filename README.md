@@ -77,7 +77,7 @@ Browsers reserve **Ctrl+W** outside fullscreen. Use **C** to crouch, or use **Pa
 - **Multiplayer:** real Colyseus rooms. Public quick-match, private room codes, roles and characters, ready/start, server-authoritative movement checks, interactions, puzzles, captures, revives and win conditions, a survivor-only radio, reconnection within 30 s, the AI taking over if the ghost player leaves, and return to lobby.
 - **Progression:** a guest profile, nine achievements, collectibles, chapter completion and character unlock conditions, all saved in local storage. Unlocks are earned in play only; there is nothing to buy.
 - **Menus:** Play Solo, Multiplayer, Character Selection with a 3D turntable, Story Chapters (all 8 listed, only Chapter 1 playable), Unlocks & Progression, Settings and Credits.
-- **Accessibility and settings:** subtitles; separate master, ambience, dialogue and effects volume; brightness; reduced flashing; reduced camera shake; horror intensity; graphics presets; FOV; sensitivity; invert-Y.
+- **Accessibility and settings:** subtitles; separate master, ambience, dialogue and effects volume; brightness; reduced camera shake; horror intensity; graphics presets (Auto/Low/Medium/High); optional FPS readout; FOV; sensitivity; invert-Y.
 
 ### Art and audio approach (be aware)
 Everything is **procedural**, and no external assets are bundled:
@@ -85,11 +85,12 @@ Everything is **procedural**, and no external assets are bundled:
 - **Atmosphere:** no rain. Height-weighted mist is densest near the ground and in the passage, with drifting fog banks, a moon, moonlight shafts through a broken roof, and dust visible only inside torch beams. A night-sky environment map gives the wet floor its reflections.
 - **Station:** a Howrah-style arched cast-iron train shed, a brick arcade with iron grilles, sodium wall lanterns, cast-iron benches, a coin weighing machine, a shrine with dried marigolds and a diya, dead indicator boards, Bengali graffiti, abandoned belongings and weeds in the ballast.
 - **Train:** a three-coach Kolkata suburban EMU rake with livery, barred windows, open doorways, bogies, roof ventilators, a raised pantograph and a cab with a working headlight. The last coach disappears into the tunnel.
-- **Rendering:** pooled real lights plus emissive fixtures and fake volumetric cones. Post-processing adds SSAO (screen-space ambient occlusion, Medium and High presets), bloom, a contrast grade, grain, vignette, and chromatic smear near the Caller.
-- **Characters:** primitive-built humanoids. The Caller and the figures watching from the mist use a custom glitching spectral shader. You hold a phone torch, and later a metal flashlight, in first person.
+- **Rendering:** pooled real lights that crossfade between fixtures, plus emissive fixtures and fake volumetric cones. Nothing strobes: power cuts, brown-outs and the Caller's drain all fade. Post-processing adds bloom on bright practicals only, a cold grade, darkening grain and a vignette; SSAO only on High.
+- **Characters:** primitive-built humanoids. The Caller and the figures watching from the mist use a custom glitching spectral shader. In first person only the top of Aditi's phone shows at the bottom of the view; its torch (later a stronger flashlight) trails your aim slightly and dims near walls so it never whites out the screen.
 - **Prologue:** a 3D desk scene with a 1990s two-in-one radio-cassette player and a handwritten cassette, shot with depth of field.
 - **Audio:** all synthesised with Web Audio, through a station-sized convolution reverb and a master limiter.
-  - Night ambience: wind through the shed, distant Kolkata traffic and horns, crickets, drips, a far-off train horn and dogs howling.
+  - In play the mix is near silent: your footsteps, your own slow, cold, shivering breathing (quicker when running, ragged when hunted, held when hiding) and a low whistling wind. The score and the extra ambience only play in menus and the prologue.
+  - Menu ambience: wind through the shed, distant Kolkata traffic and horns, crickets, drips, a far-off train horn and dogs howling.
   - Voices: formant-synthesised screams (woman, man, through a telephone), the Caller's ring-modulated shriek, and moans.
   - Score: a detuned tanpura (Karplus-Strong), dissonant strings, trembling high strings, and dhol/tasha chase percussion with a Shepard tone during hunts.
   - Spoken lines use the browser's speech voices, and subtitles carry every line.
@@ -162,9 +163,14 @@ The server needs a long-running Node.js process with WebSockets. It will not run
 ---
 
 ## Performance notes
-- Graphics presets change the pixel ratio, the number of pooled dynamic lights (4/6/8), the dust-mote count, post-processing and SSAO, flashlight and headlight shadows (High only), and texture resolution (256/512/1024).
-- Measured on Intel Iris Xe at 1024×768 (Medium): about **6 ms** for a full scene render and about **4.5 ms** of JS per frame.
+The renderer is built to hold 40–60 fps on ordinary laptops, and its tiers are ready for phones later.
+- **Device tiers** (`apps/client/src/perf/device.ts`): on first load, *Auto* reads the GPU name, core count and memory and picks Mobile, Low, Medium or High. An Intel Iris Xe laptop gets Medium.
+- **Profiles** (`state/settings.ts`): each tier sets the render-resolution range, pooled lights (2/3/4/6), post-processing, SSAO, flashlight shadows (High only), mist density, dust count, light cones, prop lights and texture size (256/512/1024).
+- **Adaptive governor** (`three/PerfGovernor.tsx`): measures real frame times. Below about 42 fps it lowers render resolution in small steps, then turns off SSAO, then post-processing. With headroom above about 56 fps it restores them. *Settings → Show frame rate* displays fps, worst frame, render scale and draw calls.
+- **Static batching** (`three/StaticBatch.tsx`): after load, everything in the station scenery that never moves is merged per material in 16 m cells. That is about 1,000 meshes in about 100 draw calls. Fans, flames and swinging lamps are detected and left alone.
+- **Measured** on Intel Iris Xe at about 980×850 on Medium: draw calls fell from about 1,300 to 90–360 a frame depending on the view, and the frame rate holds 50–60 fps. Before these changes it was far below that.
 - Rapier ships as a large WASM bundle (~1.1 MB gzipped). The first load shows a "Threading the tape…" cover while it initialises.
+- **Mobile:** the Mobile tier (half resolution, two lights, no post-processing) is in place. Touch controls and a mobile HUD are the remaining work before hosting for phones.
 
 ## Next steps
 1. Replace blockout props and characters with modelled, appropriately licensed glTF assets. Use KTX2 textures and add baked lightmaps.

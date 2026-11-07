@@ -147,8 +147,10 @@ const BANKS: [number, number, number, number][] = [];
   }
 }
 
-export function MistBanks() {
+export function MistBanks({ density = 1 }: { density?: number }) {
   const { geo, mat } = useMemo(() => {
+    // thin the banks evenly across every area rather than dropping whole areas
+    const banks = density >= 1 ? BANKS : BANKS.filter((_, i) => (i * 0.618034) % 1 < density);
     const tex = canvasTexture(128, (c, s) => {
       const img = c.createImageData(s, s);
       for (let y = 0; y < s; y++) {
@@ -178,13 +180,13 @@ export function MistBanks() {
     g.index = quad.index;
     g.setAttribute('position', quad.getAttribute('position'));
     g.setAttribute('uv', quad.getAttribute('uv'));
-    g.setAttribute('aBank', new THREE.InstancedBufferAttribute(new Float32Array(BANKS.flat()), 4));
-    g.instanceCount = BANKS.length;
+    g.setAttribute('aBank', new THREE.InstancedBufferAttribute(new Float32Array(banks.flat()), 4));
+    g.instanceCount = banks.length;
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
     const m = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { uTex: { value: tex }, uTime: { value: 0 }, uColor: { value: new THREE.Color('#4f7178') } },
+      uniforms: { uTex: { value: tex }, uTime: { value: 0 }, uColor: { value: new THREE.Color('#4f7178') }, uDensity: { value: density } },
       vertexShader: /* glsl */ `
         uniform float uTime; attribute vec4 aBank; varying vec2 vUv; varying float vFade;
         void main() {
@@ -199,20 +201,24 @@ export function MistBanks() {
           float size = aBank.w;
           vec3 p = c + right * position.x * size * 1.6 + up * position.y * size * 0.55;
           vec4 mv = viewMatrix * vec4(p, 1.0);
-          float d = -mv.z;
-          vFade = smoothstep(0.8, 4.0, d) * (1.0 - smoothstep(30.0, 45.0, d));
+          // fade by the bank's centre, so all four corners agree and the quad never tears
+          float d = -(viewMatrix * vec4(c, 1.0)).z;
+          vFade = smoothstep(2.0, 6.0, d) * (1.0 - smoothstep(30.0, 45.0, d));
           gl_Position = projectionMatrix * mv;
+          // a bank that is fully faded (too close or too far) is collapsed to a degenerate point,
+          // so it costs no fill-rate at all
+          if (vFade < 0.002) gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
         }`,
       fragmentShader: /* glsl */ `
-        uniform sampler2D uTex; uniform vec3 uColor; varying vec2 vUv; varying float vFade;
+        uniform sampler2D uTex; uniform vec3 uColor; uniform float uDensity; varying vec2 vUv; varying float vFade;
         void main() {
-          float a = texture2D(uTex, vUv).a * 0.26 * vFade;
+          float a = texture2D(uTex, vUv).a * 0.26 * vFade / max(0.6, sqrt(uDensity));
           if (a < 0.003) discard;
           gl_FragColor = vec4(uColor, a);
         }`,
     });
     return { geo: g, mat: m };
-  }, []);
+  }, [density]);
   useFrame((_, dt) => {
     mat.uniforms.uTime.value += dt;
   });

@@ -98,7 +98,7 @@ function WeighingMachine({ p }: { p: V3 }) {
 }
 
 /** A small platform shrine wrapped in red cloth, vermilion, dried marigolds and a guttering diya. */
-function Shrine({ p }: { p: V3 }) {
+function Shrine({ p, light: withLight = true }: { p: V3; light?: boolean }) {
   const flame = useRef<THREE.Mesh>(null);
   const light = useRef<THREE.PointLight>(null);
   useFrame(() => {
@@ -136,7 +136,7 @@ function Shrine({ p }: { p: V3 }) {
         <coneGeometry args={[0.01, 0.045, 8]} />
         <meshBasicMaterial color="#ffb347" />
       </mesh>
-      <pointLight ref={light} position={[0.17, 0.62, 0.12]} color="#ff9a3a" intensity={0.9} distance={2.2} decay={2} />
+      {withLight && <pointLight ref={light} position={[0.17, 0.62, 0.12]} color="#ff9a3a" intensity={0.9} distance={2.2} decay={2} />}
       {/* red threads tied around the pillar */}
       {[0.9, 1.0, 1.08].map((y) => (
         <mesh key={y} position={[0, y, -0.2]} rotation={[Math.PI / 2, 0, 0]}>
@@ -421,7 +421,7 @@ function ContactShadows() {
   );
 }
 
-export function Props() {
+export function Props({ lights = true }: { lights?: boolean }) {
   const lib = cachedTextures();
   const wood = useMemo(() => mat('#3b2616', 0.75, 0, { map: lib?.wood?.map }), [lib]);
   const iron = useMemo(() => mat('#1c1a18', 0.5, 0.75), []);
@@ -458,7 +458,7 @@ export function Props() {
         </group>
       ))}
       <WeighingMachine p={[-21.4, 0, 0.42]} />
-      <Shrine p={[-4, 0, 6.32 - 0.16]} />
+      <Shrine p={[-4, 0, 6.32 - 0.16]} light={lights} />
       <Trunk p={[8.4, 0, 5.1]} r={0.4} />
       <Doll p={[2.4, 0, 6.85]} r={1.1} />
       <Chappals p={[-6.8, 0, 3.1]} />

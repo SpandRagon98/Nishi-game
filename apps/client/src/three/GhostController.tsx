@@ -4,7 +4,6 @@ import { GHOST_ABILITIES, GHOST_SPEED, forwardFromYawPitch, zoneAt, type GhostAb
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { audio } from '../audio/engine';
-import { music } from '../audio/music';
 import { now } from '../game/fx';
 import { consumeMouse, isDown, matches } from '../game/input';
 import { runtime } from '../game/runtime';
@@ -188,7 +187,6 @@ export function GhostController({ session, level }: { session: GameSession; leve
       s.lastHud = tn;
       const zone = zoneAt(level, feet);
       audio.updateAmbience({ indoor: !!zone?.indoor, underground: feet.y < -1.5, hum: 0, ghostDist: 99, hunting: false, signalRange: 1 });
-      music.setMood(g.mode === 'hunt' || g.mode === 'warn' ? 'hunt' : 'tension');
       const readyIn = Object.fromEntries(
         (Object.keys(GHOST_ABILITIES) as GhostAbilityId[]).map((id) => [id, Math.max(0, (g.readyAt[id] ?? 0) - snap.time)]),
       ) as Record<GhostAbilityId, number>;

@@ -195,8 +195,9 @@ export function GhostActor() {
     const grp = group.current;
     if (!g || !grp) return;
     const t = now();
-    const warnFlicker = g.mode === 'warn' && Math.sin(t * 31) > 0.6;
-    grp.visible = g.visible || warnFlicker;
+    // before a hunt it surfaces as a faint, slowly breathing shape rather than a strobe
+    const warn = g.mode === 'warn' && !g.visible;
+    grp.visible = g.visible || warn;
     const target = new THREE.Vector3(g.pos.x, g.pos.y, g.pos.z);
     if (grp.position.distanceTo(target) > 4) grp.position.copy(target);
     else grp.position.lerp(target, Math.min(1, dt * 10));
@@ -206,7 +207,7 @@ export function GhostActor() {
     mat.uniforms.uTime.value = t;
     const stunned = g.mode === 'stunned' ? 1 : 0;
     mat.uniforms.uStun.value = stunned;
-    mat.uniforms.uOpacity.value = (warnFlicker ? 0.5 : 0.92) * (0.85 + Math.random() * 0.15);
+    mat.uniforms.uOpacity.value = warn ? 0.22 + 0.12 * Math.sin(t * 1.6) : 0.88 + 0.06 * Math.sin(t * 2.3);
   });
   return (
     <group ref={group} visible={false}>
