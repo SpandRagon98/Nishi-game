@@ -1,4 +1,4 @@
-import { audio } from './engine';
+import { audio, FORCE_MUTE } from './engine';
 
 /**
  * Spoken lines use the browser's built-in speech synthesis (no external TTS service, no recordings).
@@ -34,7 +34,7 @@ export interface SpeakOpts {
 }
 
 export function speak(text: string, o: SpeakOpts) {
-  if (!o.enabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  if (FORCE_MUTE || !o.enabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   try {
     const u = new SpeechSynthesisUtterance(text);
     const v = pickVoice(o.voice ?? 'in');

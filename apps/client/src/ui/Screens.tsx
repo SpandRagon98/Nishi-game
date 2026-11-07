@@ -238,6 +238,7 @@ export function SettingsPanel() {
       <section className="panel">
         <h3>Accessibility</h3>
         <Toggle label="Subtitles" value={s.subtitles} onChange={(v) => set({ subtitles: v })} />
+        <Toggle label="Objective marker" hint="Shows where your next task is and what to do there" value={s.guidance} onChange={(v) => set({ guidance: v })} />
         <Toggle label="Reduced camera shake" hint="Removes head-bob and scare shake" value={s.reducedShake} onChange={(v) => set({ reducedShake: v })} />
         <Segmented label="Horror intensity" value={s.intensity} options={[{ v: 'low', l: 'Low' }, { v: 'normal', l: 'Normal' }, { v: 'high', l: 'High' }]} onChange={(v) => set({ intensity: v })} />
         <p className="muted small">Intensity scales how often scares happen and how aggressive the Caller is. It applies from the next match.</p>

@@ -18,13 +18,17 @@ export function MainMenu() {
     audio.updateAmbience({ indoor: false, underground: false, hum: 0.1, ghostDist: 99, hunting: false, signalRange: 1, menu: true });
   }, []);
 
-  const playSolo = () => {
+  const playSolo = (prologue: boolean) => {
     useApp.setState({ start: { kind: 'solo' } });
-    go(profile.story.prologueDone ? 'loading' : 'prologue');
+    go(prologue ? 'prologue' : 'loading');
   };
+  const seen = profile.story.prologueDone;
 
   const items: { label: string; sub: string; act: () => void }[] = [
-    { label: 'Play Solo', sub: profile.story.prologueDone ? 'Chapter 1 · Platform Zero' : 'Begins with the prologue', act: playSolo },
+    seen
+      ? { label: 'Continue the Story', sub: 'Chapter 1 · Platform Zero', act: () => playSolo(false) }
+      : { label: 'Begin the Story', sub: 'Start here · the cassette, then Platform Zero', act: () => playSolo(true) },
+    ...(seen ? [{ label: 'Replay the Prologue', sub: "Your mother's cassette", act: () => playSolo(true) }] : []),
     { label: 'Multiplayer', sub: hasReconnectToken() ? 'Rejoin your last room, or start a new one' : '1–4 survivors · optional playable Caller', act: () => go('lobby') },
     { label: 'Character Selection', sub: 'Survivors and the Caller', act: () => go('characters') },
     { label: 'Story Chapters', sub: 'Eight locations · one voice', act: () => go('chapters') },

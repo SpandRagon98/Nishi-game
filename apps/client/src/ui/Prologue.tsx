@@ -10,11 +10,11 @@ import { Btn, TapeLines } from './common';
 type Step = 'intro' | 'lab' | 'playing' | 'choice' | 'rewind' | 'call' | 'arrival';
 
 const INTRO = [
-  '1999.',
-  'Project SHUNYA — a government oral-history archive — recorded forty thousand voices across India.',
-  'In March, the project was terminated without explanation.',
-  'Eleven archivists were never seen again.',
-  '2026. Kolkata.',
+  '1999. Project SHUNYA, a government sound archive, recorded forty thousand voices across India.',
+  'On the night of 13 March its last field unit went into Nishipur Junction, a station outside Kolkata, to record something that answered back.',
+  'None of the four came back. One of them was Mrinalini Sen.',
+  'Your mother.',
+  'Twenty-seven years later, a parcel with no stamp arrives at your lab. Inside is one cassette, labelled in her handwriting.',
 ];
 
 function useTyped(text: string, speed = 28) {
@@ -34,6 +34,8 @@ export function Prologue() {
   const [step, setStep] = useState<Step>('intro');
   const [line, setLine] = useState(0);
   const [sub, setSub] = useState('');
+  const [armed, setArmed] = useState(false);
+  const armTimer = useRef(0);
   const timers = useRef<number[]>([]);
   const [typed, finishTyping] = useTyped(step === 'intro' ? INTRO[line] : '', 30);
 
@@ -55,6 +57,18 @@ export function Prologue() {
     useApp.getState().toast({ title: 'Achievement: Reel 7731', text: 'You completed the prologue.', tone: 'unlock' });
     setStep('arrival');
     later(5200, () => go('loading'));
+  };
+
+  // skipping is permanent for this profile, so it takes a second press
+  const requestSkip = () => {
+    if (step === 'arrival') return;
+    if (!armed) {
+      setArmed(true);
+      clearTimeout(armTimer.current);
+      armTimer.current = window.setTimeout(() => setArmed(false), 3000);
+      return;
+    }
+    skip();
   };
 
   const skip = () => {
@@ -113,7 +127,7 @@ export function Prologue() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Escape') skip();
+      if (e.code === 'Escape') requestSkip();
       if (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') {
         if (step === 'intro') next();
         else if (step === 'lab') playTape();
@@ -133,11 +147,15 @@ export function Prologue() {
   return (
     <div className="prologue" onClick={() => step === 'intro' && next()}>
       <TapeLines />
-      <button className="skip" onClick={(e) => { e.stopPropagation(); skip(); }}>Skip prologue (Esc)</button>
+      {step !== 'arrival' && (
+        <button className={`skip${armed ? ' armed' : ''}`} onClick={(e) => { e.stopPropagation(); requestSkip(); }}>
+          {armed ? 'Skip the story? Press again (Esc)' : 'Skip prologue (Esc)'}
+        </button>
+      )}
       {step === 'intro' && (
         <div className="prologue-text">
           <p>{typed}<span className="caret">▍</span></p>
-          <small>Click or press E to continue</small>
+          <small>{line + 1} / {INTRO.length} · Click or press E to continue</small>
         </div>
       )}
       {(step === 'lab' || step === 'playing' || step === 'choice' || step === 'rewind' || step === 'call') && (

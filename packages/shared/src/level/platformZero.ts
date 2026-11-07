@@ -193,6 +193,9 @@ export const PLATFORM_ZERO: LevelDef = {
       id: `l_lantern_${i}`, pos: v3(x, 2.9, 0.32), color: '#ffa04a', intensity: 2.4, distance: 7.5,
       circuit: 'emergency' as const, zone: 'platform', kind: 'lantern' as const, faulty: [0.15, 0.5, 0.05, 0.3, 0.6][i],
     })),
+    // the parked EMU's battery-fed saloon tubes: cold, dim, one of them failing
+    { id: 'l_carriage_em_w', pos: v3(-6.5, 2.5, 10), color: '#d8f0ec', intensity: 11, distance: 11, circuit: 'emergency', zone: 'carriage', kind: 'tube', faulty: 0.35 },
+    { id: 'l_carriage_em_e', pos: v3(6.5, 2.5, 10), color: '#d8f0ec', intensity: 9, distance: 11, circuit: 'emergency', zone: 'carriage', kind: 'tube', faulty: 0.12 },
     { id: 'l_signal_red', pos: v3(15, 2.4, -13.2), color: '#ff3b2a', intensity: 2.5, distance: 7, circuit: 'emergency', zone: 'signal', kind: 'lamp', faulty: 0.1 },
     // main circuit — restored by the fuse puzzle
     { id: 'l_plat_w', pos: v3(-32, 4.7, 4), color: '#fff1c4', intensity: 10, distance: 18, circuit: 'main', zone: 'platform', kind: 'tube', faulty: 0.1 },
@@ -203,7 +206,7 @@ export const PLATFORM_ZERO: LevelDef = {
     { id: 'l_office', pos: v3(5, 3.9, -7), color: '#ffe8b0', intensity: 7, distance: 12, circuit: 'main', zone: 'office', kind: 'bulb', faulty: 0.05 },
     { id: 'l_signal', pos: v3(15, 3.9, -7), color: '#fff4d6', intensity: 7, distance: 12, circuit: 'main', zone: 'signal', kind: 'tube', faulty: 0.1 },
     { id: 'l_passage', pos: v3(15, -0.9, 3.5), color: '#e2f0ff', intensity: 5, distance: 12, circuit: 'main', zone: 'passage', kind: 'tube', faulty: 0.2 },
-    { id: 'l_carriage', pos: v3(0, 2.5, 10), color: '#fff0c8', intensity: 4, distance: 10, circuit: 'main', zone: 'carriage', kind: 'bulb', faulty: 0.25 },
+    { id: 'l_carriage', pos: v3(0, 2.5, 10), color: '#fff0c8', intensity: 12, distance: 13, circuit: 'main', zone: 'carriage', kind: 'bulb', faulty: 0.25 },
     { id: 'l_exit', pos: v3(-10, 3.0, -18), color: '#ffe5b0', intensity: 5, distance: 10, circuit: 'main', zone: 'exit', kind: 'bulb', faulty: 0.1 },
   ],
   doors: [
@@ -224,21 +227,22 @@ export const PLATFORM_ZERO: LevelDef = {
   ],
   interactables: [
     {
-      id: 'flashlight_kit', kind: 'flashlight_kit', label: 'Emergency kit', zone: 'platform', radius: 2.2,
-      candidates: [v3(-16, 0.55, 5.85), v3(-24, 1.15, -6.15), v3(-15.5, 0.55, -4.5)],
+      // always on the bench a few steps from where you arrive, so the first task is easy to find
+      id: 'flashlight_kit', kind: 'flashlight_kit', label: 'Red emergency kit', zone: 'platform', radius: 3,
+      candidates: [v3(-16, 0.55, 5.85)],
     },
-    { id: 'logbook', kind: 'logbook', label: "Station master's logbook", pos: v3(4, 0.83, -7.4), zone: 'office', radius: 2 },
-    { id: 'drawer', kind: 'drawer', label: 'Desk drawer', pos: v3(5.6, 0.6, -6.95), zone: 'office', radius: 2 },
-    { id: 'phone', kind: 'phone', label: 'Old telephone', pos: v3(6.4, 0.86, -7.5), zone: 'office', radius: 2 },
+    { id: 'logbook', kind: 'logbook', label: "Station master's logbook", pos: v3(4, 0.83, -7.4), zone: 'office', radius: 2.5 },
+    { id: 'drawer', kind: 'drawer', label: 'Desk drawer', pos: v3(5.6, 0.6, -6.95), zone: 'office', radius: 2.5 },
+    { id: 'phone', kind: 'phone', label: 'Old telephone', pos: v3(6.4, 0.86, -7.5), zone: 'office', radius: 2.5 },
     ...(['a', 'b', 'c'] as const).map((k) => ({
-      id: `reel_${k}`, kind: 'reel' as const, label: `Audio reel ${k.toUpperCase()}`, zone: 'any', radius: 2,
+      id: `reel_${k}`, kind: 'reel' as const, label: `Audio reel ${k.toUpperCase()}`, zone: 'any', radius: 2.8,
     })),
-    { id: 'fuse_box', kind: 'fuse_box', label: 'Fuse box', pos: v3(25, 1.5, -13.6), zone: 'maintenance', radius: 2.2 },
-    { id: 'pa_console', kind: 'pa_console', label: 'Announcement console', pos: v3(18.5, 1.05, -7.5), zone: 'signal', radius: 2.2 },
+    { id: 'fuse_box', kind: 'fuse_box', label: 'Fuse box', pos: v3(25, 1.5, -13.6), zone: 'maintenance', radius: 2.7 },
+    { id: 'pa_console', kind: 'pa_console', label: 'Announcement console', pos: v3(18.5, 1.05, -7.5), zone: 'signal', radius: 2.7 },
     { id: 'exit_gate', kind: 'exit_gate', label: 'Collapsible exit gate', pos: v3(-10, 1.2, -13.7), zone: 'concourse', radius: 2.6 },
-    { id: 'note_ticket', kind: 'note', label: 'Old ticket stub', pos: v3(-27.2, 1.12, -6.2), zone: 'ticket', radius: 2 },
-    { id: 'note_memo', kind: 'note', label: 'Typed memorandum', pos: v3(12.5, 1.22, -12.9), zone: 'signal', radius: 2 },
-    { id: 'note_photo', kind: 'note', label: 'Faded photograph', pos: v3(-4.2, 0.52, 11), zone: 'carriage', radius: 2 },
+    { id: 'note_ticket', kind: 'note', label: 'Old ticket stub', pos: v3(-27.2, 1.12, -6.2), zone: 'ticket', radius: 2.5 },
+    { id: 'note_memo', kind: 'note', label: 'Typed memorandum', pos: v3(12.5, 1.22, -12.9), zone: 'signal', radius: 2.5 },
+    { id: 'note_photo', kind: 'note', label: 'Faded photograph', pos: v3(-4.2, 0.52, 11), zone: 'carriage', radius: 2.5 },
   ],
   waypoints: [
     // platform north row

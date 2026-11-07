@@ -411,3 +411,38 @@ input[type='range'] { accent-color: var(--crimson-hi); width: 100%; }
 /* optional frame-rate readout */
 .fps-meter { position: absolute; right: 12px; top: 10px; z-index: 30; font-family: var(--mono); font-size: 11px; color: rgba(220,230,230,0.75); background: rgba(0,0,0,0.45); padding: 4px 8px; pointer-events: none; }
 .fps-meter b.ok { color: #7fd18b; } .fps-meter b.mid { color: #e2c26a; } .fps-meter b.bad { color: #e0695e; }
+
+/* loading: story recap that fits small laptop screens */
+.loading-inner { max-height: 100vh; overflow-y: auto; padding: clamp(20px, 6vh, 64px) 7vw; }
+.loading-title { font-size: clamp(40px, 6vw, 88px); }
+.loading-line { min-height: 0; font-size: clamp(15px, 1.6vw, 20px); margin: 4px 0 14px; }
+.loading-story { max-width: 620px; border-left: 2px solid var(--crimson); padding: 4px 0 4px 18px; margin: 10px 0 6px; background: linear-gradient(90deg, rgba(0,0,0,0.55), transparent); }
+.loading-story h2 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--crimson-hi); margin: 10px 0 6px; font-weight: 500; }
+.loading-story p, .loading-story li { font-family: var(--serif); font-size: clamp(14px, 1.35vw, 17px); line-height: 1.5; color: var(--bone); margin: 0; }
+.loading-story ol { margin: 0; padding-left: 20px; }
+.loading-story b { color: #fff; font-weight: 600; }
+.loading-warn { margin-top: 10px !important; font-style: italic; color: var(--bone-dim) !important; }
+.loading-bar { margin: 16px 0; }
+.controls-hint { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 18px; }
+.controls-hint kbd { display: inline-block; min-width: 18px; text-align: center; padding: 1px 6px; border: 1px solid var(--line); border-radius: 3px; color: var(--bone); background: rgba(255,255,255,0.04); font-family: var(--mono); font-size: 10px; }
+.loading-tip { font-family: var(--mono); font-size: 11px; color: var(--grey); margin-top: 10px; }
+.skip.armed { color: var(--bone); border-color: var(--crimson-hi); background: rgba(120, 20, 20, 0.35); }
+
+/* guidance: objective hint, top-centre marker, story cards */
+.hud-hint { font-size: 12.5px; line-height: 1.45; color: var(--bone-dim); margin-top: 6px; max-width: 360px; text-shadow: 0 1px 6px #000; }
+.guide { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 10px; background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.25)); border-bottom: 1px solid rgba(196,54,43,0.55); max-width: min(560px, 60vw); pointer-events: none; }
+.guide-arrow { width: 30px; height: 30px; display: grid; place-items: center; color: #e9c46a; filter: drop-shadow(0 0 6px rgba(233,196,106,0.5)); transition: transform 0.12s linear; flex: none; }
+.guide-step { font-family: var(--serif); font-size: 16px; color: var(--bone); line-height: 1.25; text-shadow: 0 1px 6px #000; }
+.guide-dist { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; color: #e9c46a; margin-top: 2px; text-transform: uppercase; }
+.story-card { position: absolute; left: 30px; top: 50%; transform: translateY(-40%); width: min(400px, 38vw); padding: 16px 20px 18px; background: linear-gradient(90deg, rgba(4,4,4,0.86), rgba(4,4,4,0.62)); border-left: 2px solid var(--crimson-hi); animation: storyin 0.9s ease-out; pointer-events: none; z-index: 6; }
+.story-kicker { font-family: var(--mono); font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--crimson-hi); }
+.story-card h3 { font-family: var(--serif); font-weight: 500; font-size: 22px; color: #efe8d8; margin: 4px 0 8px; }
+.story-card p { font-family: var(--serif); font-size: 15px; line-height: 1.55; color: var(--bone); margin: 0; }
+.story-next { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.45; color: #e9c46a; }
+.story-next span { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--grey); margin-bottom: 2px; }
+@keyframes storyin { from { opacity: 0; transform: translate(-16px, -40%); } to { opacity: 1; transform: translateY(-40%); } }
+.story-log { max-height: 34vh; overflow: auto; margin-bottom: 14px; }
+.story-log p { font-family: var(--serif); font-size: 14px; line-height: 1.5; color: var(--bone-dim); margin: 0 0 8px; }
+.story-log b { color: var(--bone); font-weight: 600; }
+.puzzle-help { font-family: var(--mono); font-size: 12px; line-height: 1.6; color: #e9c46a; background: rgba(233,196,106,0.07); border-left: 2px solid #e9c46a; padding: 8px 12px; margin-top: 12px; }
+@media (max-height: 700px) { .story-card { top: auto; bottom: 22%; transform: none; animation: none; } }

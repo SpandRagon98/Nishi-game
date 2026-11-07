@@ -16,6 +16,10 @@ export interface BreathState {
 
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 
+/** Dev-only: `?mute` in the URL silences everything (automated tests must never make sound). */
+export const FORCE_MUTE =
+  import.meta.env.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).has('mute');
+
 class AudioEngine {
   ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -60,6 +64,7 @@ class AudioEngine {
       limiter.ratio.value = 14;
       limiter.attack.value = 0.003;
       limiter.release.value = 0.25;
+      if (FORCE_MUTE) this.master.gain.value = 0;
       this.master.connect(limiter).connect(this.duck).connect(ctx.destination);
       limiter.connect(this.analyser);
       this.buses = { ambience: ctx.createGain(), dialogue: ctx.createGain(), effects: ctx.createGain(), music: ctx.createGain() };
@@ -122,7 +127,7 @@ class AudioEngine {
   private applyVolumes() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    this.master.gain.setTargetAtTime(this.volumes.master, t, 0.05);
+    this.master.gain.setTargetAtTime(FORCE_MUTE ? 0 : this.volumes.master, t, 0.05);
     this.buses.ambience.gain.setTargetAtTime(this.volumes.ambience, t, 0.05);
     this.buses.dialogue.gain.setTargetAtTime(this.volumes.dialogue, t, 0.05);
     this.buses.effects.gain.setTargetAtTime(this.volumes.effects, t, 0.05);
@@ -1050,73 +1055,20 @@ class AudioEngine {
     const target = Math.max(p.exertion, p.down ? 0.75 : 0, p.fear * 0.55);
     this.breathEffort += (target - this.breathEffort) * (target > this.breathEffort ? 0.55 : 0.16);
     const e = this.breathEffort;
-    const inhale = lerp(1.45, 0.5, e);
-    const exhale = lerp(2.1, 0.62, e);
+    // no two breaths are the same length
+    const vary = () => 1 + (Math.random() * 2 - 1) * 0.13;
+    const inhale = lerp(1.35, 0.42, e) * vary() * (p.hiding ? 0.6 : 1);
+    const exhale = lerp(2.0, 0.55, e) * vary() * (p.hiding ? 0.7 : 1);
     // hiding: shallow, held breaths with long gaps
     const pause = p.hiding ? 2.4 + Math.random() : lerp(1.8, 0.06, e) + Math.random() * 0.25;
-    const loud = (p.hiding ? 0.4 : 1) * lerp(0.06, 0.15, e);
-    if (!document.hidden) this.breathe(inhale, exhale, loud, p.fear, p.voice);
+    const loud = (p.hiding ? 0.4 : 1) * lerp(0.07, 0.17, e) * (0.88 + Math.random() * 0.24);
+    if (!document.hidden) this.breathe(inhale, exhale, loud, e, p.fear, p.hiding, p.down, p.voice);
     this.breathTimer = window.setTimeout(() => this.nextBreath(), (inhale + exhale + pause) * 1000);
   }
 
-  /** One breath of cold night air: a narrow hiss drawn in, a lower, shaky sigh out. */
-  private breathe(inh: number, exh: number, loud: number, fear: number, voice: 'woman' | 'man') {
-    const ctx = this.ctx!;
-    const dest = this.buses.effects;
-    const k = voice === 'man' ? 0.8 : 1;
-    const t = ctx.currentTime + 0.02;
-
-    const inSrc = this.noiseSrc(true);
-    const inHp = ctx.createBiquadFilter();
-    inHp.type = 'highpass';
-    inHp.frequency.value = 380;
-    const inBp = ctx.createBiquadFilter();
-    inBp.type = 'bandpass';
-    inBp.Q.value = 1.2;
-    inBp.frequency.setValueAtTime(950 * k, t);
-    inBp.frequency.linearRampToValueAtTime(1550 * k, t + inh);
-    const inG = ctx.createGain();
-    inG.gain.setValueAtTime(0, t);
-    inG.gain.linearRampToValueAtTime(loud * 0.65, t + inh * 0.6);
-    inG.gain.linearRampToValueAtTime(0, t + inh);
-    inSrc.connect(inHp).connect(inBp).connect(inG).connect(dest);
-    inSrc.start(t, Math.random() * 1.5);
-    inSrc.stop(t + inh + 0.05);
-
-    const t2 = t + inh + 0.05;
-    const exSrc = this.noiseSrc(true);
-    const body = ctx.createBiquadFilter();
-    body.type = 'bandpass';
-    body.Q.value = 0.8;
-    body.frequency.setValueAtTime(700 * k, t2);
-    body.frequency.linearRampToValueAtTime(430 * k, t2 + exh);
-    // a faint "hhh" vowel colour on top
-    const vowel = ctx.createBiquadFilter();
-    vowel.type = 'bandpass';
-    vowel.Q.value = 5;
-    vowel.frequency.value = 1350 * k;
-    const vowelG = ctx.createGain();
-    vowelG.gain.value = 0.35;
-    const exG = ctx.createGain();
-    exG.gain.setValueAtTime(0, t2);
-    exG.gain.linearRampToValueAtTime(loud, t2 + Math.min(0.18, exh * 0.2));
-    exG.gain.setTargetAtTime(0, t2 + exh * 0.35, exh * 0.25);
-    // the cold makes the out-breath shiver
-    const shiver = ctx.createGain();
-    const depth = 0.12 + fear * 0.25;
-    shiver.gain.value = 1 - depth;
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 5.5 + fear * 4 + Math.random();
-    const lfoG = ctx.createGain();
-    lfoG.gain.value = depth;
-    lfo.connect(lfoG).connect(shiver.gain);
-    exSrc.connect(body).connect(exG);
-    exSrc.connect(vowel).connect(vowelG).connect(exG);
-    exG.connect(shiver).connect(dest);
-    exSrc.start(t2, Math.random() * 1.5);
-    exSrc.stop(t2 + exh + 0.3);
-    lfo.start(t2);
-    lfo.stop(t2 + exh + 0.3);
+  /** One breath, rendered into the effects bus. */
+  private breathe(inh: number, exh: number, loud: number, effort: number, fear: number, hiding: boolean, down: boolean, voice: 'woman' | 'man') {
+    renderBreath(this.ctx!, this.buses.effects, this.ctx!.currentTime + 0.03, { inh, exh, loud, effort, fear, hiding, down, voice });
   }
 
   stopAllLoops() {
@@ -1127,3 +1079,187 @@ class AudioEngine {
 }
 
 export const audio = new AudioEngine();
+
+// ───────────────────────────── breathing ─────────────────────────────
+
+export interface BreathParams {
+  inh: number;
+  exh: number;
+  loud: number;
+  /** smoothed exertion 0..1 */
+  effort: number;
+  fear: number;
+  hiding: boolean;
+  down: boolean;
+  voice: 'woman' | 'man';
+}
+
+const pinkCache = new WeakMap<BaseAudioContext, AudioBuffer>();
+/** Pink noise (Paul Kellet's filter): airflow has far more low-mid energy than white hiss. */
+function pinkNoise(ctx: BaseAudioContext) {
+  let buf = pinkCache.get(ctx);
+  if (buf) return buf;
+  const len = ctx.sampleRate * 3;
+  buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+  for (let i = 0; i < len; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = 0.99886 * b0 + w * 0.0555179;
+    b1 = 0.99332 * b1 + w * 0.0750759;
+    b2 = 0.969 * b2 + w * 0.153852;
+    b3 = 0.8665 * b3 + w * 0.3104856;
+    b4 = 0.55 * b4 + w * 0.5329522;
+    b5 = -0.7616 * b5 - w * 0.016898;
+    d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.12;
+    b6 = w * 0.115926;
+  }
+  pinkCache.set(ctx, buf);
+  return buf;
+}
+
+/** Smooth value-noise over 0..1 giving 1 ± depth, so an envelope wavers like a real chest, not a sine LFO. */
+function wobble(depth: number, knots: number) {
+  const k = Array.from({ length: knots + 2 }, () => Math.random() * 2 - 1);
+  return (x: number) => {
+    const p = x * knots;
+    const i = Math.min(knots, Math.floor(p));
+    const f = p - i;
+    const s = f * f * (3 - 2 * f);
+    return 1 + depth * (k[i] * (1 - s) + k[i + 1] * s);
+  };
+}
+
+function curve(n: number, fn: (x: number) => number) {
+  const a = new Float32Array(n);
+  for (let i = 0; i < n; i++) a[i] = Math.max(0, fn(i / (n - 1)));
+  return a;
+}
+
+/** One resonance of the vocal tract: band-pass at `f`, gliding to `f * glide` over `dur`. */
+function formant(ctx: BaseAudioContext, input: AudioNode, out: AudioNode, f: number, q: number, gain: number, t: number, dur: number, glide = 1) {
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.Q.value = q;
+  bp.frequency.setValueAtTime(f, t);
+  if (glide !== 1) bp.frequency.exponentialRampToValueAtTime(f * glide, t + dur);
+  const g = ctx.createGain();
+  g.gain.value = gain;
+  input.connect(bp).connect(g).connect(out);
+}
+
+/**
+ * One human breath, synthesised. Airflow is pink noise shaped by the resonances of the nose (calm
+ * in-breaths) or the open mouth (effort, fear). The in-breath swells and is cut off sharply when the
+ * lungs are full; the out-breath lands with a soft push and trails away. Every breath gets its own
+ * length, loudness, formant shift and wavering contour. Frightened in-breaths catch two or three
+ * times; hard or frightened out-breaths begin with a faint voiced "hah". Returns when the breath ends.
+ */
+export function renderBreath(ctx: BaseAudioContext, dest: AudioNode, t: number, p: BreathParams) {
+  const man = p.voice === 'man';
+  const fs = (man ? 0.84 : 1) * (1 + (Math.random() * 2 - 1) * 0.05);
+  const mouth = !p.hiding && (p.effort > 0.4 || p.fear > 0.55 || p.down);
+  const pink = pinkNoise(ctx);
+  const N = 256;
+  // formant filtering removes most of the noise energy: bring it back to the old breath's level
+  const L = p.loud * MAKEUP;
+
+  // ── in-breath ──
+  const inSrc = ctx.createBufferSource();
+  inSrc.buffer = pink;
+  inSrc.loop = true;
+  const inBus = ctx.createGain();
+  const catches = p.fear > 0.45 && !p.hiding ? 1 + Math.round(Math.random() + p.fear) : 0;
+  const catchAt = Array.from({ length: catches }, (_, i) => (i + 1) / (catches + 1) + (Math.random() - 0.5) * 0.08);
+  const inWob = wobble(0.1 + p.fear * 0.15, 5);
+  const inEnv = curve(N, (x) => {
+    let v = Math.pow(Math.sin((Math.PI / 2) * Math.min(1, x / 0.72)), 1.6);
+    if (x > 0.93) v *= (1 - x) / 0.07; // lungs full: the draw stops abruptly
+    for (const c of catchAt) v *= 1 - 0.85 * Math.exp(-(((x - c) / 0.035) ** 2));
+    return v * inWob(x);
+  });
+  const inGain = L * (mouth ? 0.95 : 0.7);
+  const inG = ctx.createGain();
+  inG.gain.value = 0;
+  inG.gain.setValueCurveAtTime(inEnv.map((v) => v * inGain), t, p.inh);
+  if (mouth) {
+    // open-mouth gasp: a raised, tense "hhh" with a little sibilance from the teeth
+    formant(ctx, inSrc, inBus, 520 * fs, 3.5, 0.55, t, p.inh, 1.08);
+    formant(ctx, inSrc, inBus, 1750 * fs, 4.5, 0.75, t, p.inh, 1.05);
+    formant(ctx, inSrc, inBus, 2800 * fs, 5, 0.45, t, p.inh);
+    const hiss = ctx.createBiquadFilter();
+    hiss.type = 'highpass';
+    hiss.frequency.value = 3600;
+    const hg = ctx.createGain();
+    hg.gain.value = 0.16;
+    inSrc.connect(hiss).connect(hg).connect(inBus);
+  } else {
+    // through the nose: narrow and nasal, cold air drawn in quietly
+    formant(ctx, inSrc, inBus, 1100 * fs, 2.2, 0.5, t, p.inh, 1.15);
+    formant(ctx, inSrc, inBus, 2500 * fs, 3, 0.5, t, p.inh, 1.1);
+    formant(ctx, inSrc, inBus, 260 * fs, 2, 0.2, t, p.inh);
+  }
+  inBus.connect(inG).connect(dest);
+  inSrc.start(t, Math.random() * 2);
+  inSrc.stop(t + p.inh + 0.05);
+
+  // ── turnaround: a brief stillness, longer when calm or hiding ──
+  const t2 = t + p.inh + (p.hiding ? 0.35 : 0.04 + (1 - p.effort) * 0.16) * (0.7 + Math.random() * 0.6);
+
+  // ── out-breath ──
+  const exSrc = ctx.createBufferSource();
+  exSrc.buffer = pink;
+  exSrc.loop = true;
+  const exBus = ctx.createGain();
+  const att = mouth ? 0.07 : 0.16;
+  const fall = mouth ? 3.4 : 2.6;
+  const exWob = wobble(0.1 + p.fear * 0.3, 4 + Math.round(p.fear * 10));
+  const exEnv = curve(N, (x) => {
+    const v = x < att ? Math.sqrt(x / att) : Math.exp(-fall * ((x - att) / (1 - att)));
+    return v * (x > 0.9 ? (1 - x) / 0.1 : 1) * exWob(x);
+  });
+  const exG = ctx.createGain();
+  exG.gain.value = 0;
+  exG.gain.setValueCurveAtTime(exEnv.map((v) => v * L), t2, p.exh);
+  // the tract relaxes as the air runs out, so every resonance drifts down a little
+  const open = mouth ? 1 : 0.8;
+  formant(ctx, exSrc, exBus, 700 * fs * open, 4, 1, t2, p.exh, 0.86);
+  formant(ctx, exSrc, exBus, 1220 * fs, 5, 0.55, t2, p.exh, 0.93);
+  formant(ctx, exSrc, exBus, 2600 * fs, 6, mouth ? 0.24 : 0.12, t2, p.exh);
+  const bodyLp = ctx.createBiquadFilter();
+  bodyLp.type = 'lowpass';
+  bodyLp.frequency.value = mouth ? 1900 : 1200;
+  const bodyG = ctx.createGain();
+  bodyG.gain.value = 0.3;
+  exSrc.connect(bodyLp).connect(bodyG).connect(exBus);
+  exBus.connect(exG).connect(dest);
+  exSrc.start(t2, Math.random() * 2);
+  exSrc.stop(t2 + p.exh + 0.05);
+
+  // ── voiced onset: the vocal folds catch for an instant on a hard or frightened out-breath ──
+  const voiced = Math.max(p.effort - 0.5, 0) * 1.6 + Math.max(p.fear - 0.5, 0) * 1.4 + (p.down ? 0.6 : 0);
+  if (voiced > 0.05 && !p.hiding && Math.random() < 0.85) {
+    const f0 = (man ? 112 : 208) * (1 + (Math.random() * 2 - 1) * 0.06);
+    const dur = 0.16 + Math.random() * 0.12 + (p.down ? 0.25 : 0);
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(f0 * 1.04, t2);
+    osc.frequency.exponentialRampToValueAtTime(f0 * 0.86, t2 + dur);
+    const vBus = ctx.createGain();
+    formant(ctx, osc, vBus, 720 * fs, 6, 1, t2, dur, 0.9);
+    formant(ctx, osc, vBus, 1240 * fs, 7, 0.5, t2, dur);
+    const vg = ctx.createGain();
+    const peak = L * VOICE_LEVEL * Math.min(1, voiced);
+    vg.gain.setValueAtTime(0, t2);
+    vg.gain.linearRampToValueAtTime(peak, t2 + 0.03);
+    vg.gain.setTargetAtTime(0, t2 + 0.05, dur * 0.35);
+    vBus.connect(vg).connect(dest);
+    osc.start(t2);
+    osc.stop(t2 + dur + 0.3);
+  }
+  return t2 + p.exh;
+}
+
+/** how loud the voiced onset sits under the airflow (tuned by offline RMS measurement) */
+const VOICE_LEVEL = 0.022;
+const MAKEUP = 2.2;

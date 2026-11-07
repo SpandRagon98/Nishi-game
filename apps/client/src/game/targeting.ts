@@ -51,7 +51,8 @@ export function findTarget(level: LevelDef, snap: WorldSnapshot, me: SurvivorVie
         label = `Read: ${def.label}`;
         break;
     }
-    cands.push({ id: def.id, label, kind: 'item', pos, range: def.kind === 'exit_gate' ? 2.6 : 2.2, cone: def.kind === 'exit_gate' ? 0.6 : 0.82 });
+    // a generous reach and view cone: you only need to roughly face an item to pick it up
+    cands.push({ id: def.id, label, kind: 'item', pos, range: Math.max(2.2, def.radius - 0.05), cone: def.kind === 'exit_gate' ? 0.55 : 0.68 });
   }
 
   for (const d of level.doors) {

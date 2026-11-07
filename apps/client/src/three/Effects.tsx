@@ -1,4 +1,4 @@
-import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, Noise, SSAO, Vignette } from '@react-three/postprocessing';
+import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, Noise, SMAA, SSAO, Vignette } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
 
 /**
@@ -33,6 +33,8 @@ export function Effects({ ghostVision, ao = false }: { ghostVision: boolean; ao?
       <BrightnessContrast brightness={-0.04} contrast={0.14} />
       <Noise blendFunction={BlendFunction.MULTIPLY} opacity={0.16} />
       <Vignette offset={0.18} darkness={ghostVision ? 0.92 : 0.86} eskil={false} />
+      {/* the canvas runs without MSAA; SMAA cleans up the stair-stepping on rails, tiles and cables */}
+      <SMAA />
     </EffectComposer>
   );
 }

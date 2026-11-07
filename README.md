@@ -46,7 +46,7 @@ To test from another device on your LAN, open `http://<your-ip>:5173`. The clien
 | Key | Survivor | The Caller |
 |---|---|---|
 | WASD / mouse | Move / look (click the view to capture the mouse) | Move / look. The Caller drifts through doors. |
-| Shift | Sprint (limited stamina) | — |
+| Shift | Sprint (never runs out) | — |
 | Ctrl or C | Crouch (quieter, harder to see) | — |
 | E | Interact · hide / leave hiding · hold to revive | — |
 | F | Flashlight. Hold the beam on a hunting Caller to stun it. | — |
@@ -68,11 +68,13 @@ Browsers reserve **Ctrl+W** outside fullscreen. Use **C** to crouch, or use **Pa
 - **Platform Zero**, a full mission: a deserted platform with stairwells, the station master's office, the signal control room, a parked carriage, the ticket office, an underground passage with an alcove, a maintenance room, five hiding places, a locked collapsible exit gate, and a tunnel blocked by rubble and darkness.
 - **Objectives:** find a flashlight → search the office (logbook and drawer key) → recover 3 reels (spawned at random from 9 spots) → solve the fuse-box puzzle → decode the announcement on the keypad → open the gate (this triggers a forced final hunt) → escape.
 - **Solo:** checkpoints at each objective, failure with Retry-from-checkpoint or Restart, and a victory screen.
+- **Story first:** new players start with **Begin the Story** (returning players get Continue / Replay the Prologue; skipping takes a second Esc). The loading screen recaps the story and tonight's goal, and in play every turning point arrives as a story card (her torch, the station master's log, each reel's voice, the first hunt, the escape) that ends with a clear *Next* step. The journal (Tab) keeps "The story so far".
+- **Guidance:** the HUD shows the current objective with a plain-language hint, and a marker at the top of the screen points along the walkable route to the next step with its distance (including "take the stairs up/down"). The fuse box shows the logbook ratings once read, and the console shows your reel numbers and the announced order. It can be turned off in Settings.
 - **Interactive prologue:** a tape deck with a branching choice.
 - **AI ghost:** roams, stalks and hunts; sees flashlights, hears sprinting; can be broken off by hiding or losing line of sight; stunned by flashlights.
 - **Adaptive horror director:** nine handcrafted events chosen by threat, progress, isolation, cooldowns and priority, from a seeded RNG.
 - **Threat escalation:** a 3:13 AM clock, and threat that rises over time and with objectives. At 100 threat the Caller makes "the third call" and hunts permanently.
-- **Two survivors:** Aditi Sen has Echo Sense, which reveals the Caller, false sounds and forged radio messages. Kabir Khan revives 2.5× faster, has more endurance, and has Adrenaline.
+- **Two survivors:** Aditi Sen has Echo Sense, which reveals the Caller, false sounds and forged radio messages. Kabir Khan revives 2.5× faster and has Adrenaline (sprint 30% faster for 6 s). Sprinting never tires anyone out.
 - **Playable ghost:** five abilities with energy, cooldowns, a 60 s hunt grace period, a warning before each hunt, and server validation.
 - **Multiplayer:** real Colyseus rooms. Public quick-match, private room codes, roles and characters, ready/start, server-authoritative movement checks, interactions, puzzles, captures, revives and win conditions, a survivor-only radio, reconnection within 30 s, the AI taking over if the ghost player leaves, and return to lobby.
 - **Progression:** a guest profile, nine achievements, collectibles, chapter completion and character unlock conditions, all saved in local storage. Unlocks are earned in play only; there is nothing to buy.
@@ -81,15 +83,16 @@ Browsers reserve **Ctrl+W** outside fullscreen. Use **C** to crouch, or use **Pa
 
 ### Art and audio approach (be aware)
 Everything is **procedural**, and no external assets are bundled:
-- **Materials:** canvas-painted PBR sets (albedo, roughness and normal) with world-space UVs, such as wet platform tiles, two-tone railway plaster, terrazzo, rust, brick, ballast, corrugated sheet, coach paint and glazed tiles.
+- **Materials:** canvas-painted PBR sets (albedo, roughness and normal) with world-space UVs, broken up by a world-space weathering layer (grime blotches, rust drip streaks down walls, glossy damp patches on floors) so no two metres look alike, such as wet platform tiles, two-tone railway plaster, terrazzo, rust, brick, ballast, corrugated sheet, coach paint and glazed tiles.
 - **Atmosphere:** no rain. Height-weighted mist is densest near the ground and in the passage, with drifting fog banks, a moon, moonlight shafts through a broken roof, and dust visible only inside torch beams. A night-sky environment map gives the wet floor its reflections.
 - **Station:** a Howrah-style arched cast-iron train shed, a brick arcade with iron grilles, sodium wall lanterns, cast-iron benches, a coin weighing machine, a shrine with dried marigolds and a diya, dead indicator boards, Bengali graffiti, abandoned belongings and weeds in the ballast.
-- **Train:** a three-coach Kolkata suburban EMU rake with livery, barred windows, open doorways, bogies, roof ventilators, a raised pantograph and a cab with a working headlight. The last coach disappears into the tunnel.
-- **Rendering:** pooled real lights that crossfade between fixtures, plus emissive fixtures and fake volumetric cones. Nothing strobes: power cuts, brown-outs and the Caller's drain all fade. Post-processing adds bloom on bright practicals only, a cold grade, darkening grain and a vignette; SSAO only on High.
+- **Train:** a three-coach Kolkata suburban EMU rake with livery, barred windows, open doorways, bogies, roof ventilators, a raised pantograph and a cab with a working headlight. The last coach disappears into the tunnel. The walk-through coach has its own dim battery-fed saloon tubes.
+- **Rendering:** pooled real lights that crossfade between fixtures, plus emissive fixtures and fake volumetric cones. Nothing strobes: power cuts, brown-outs and the Caller's drain all fade. Post-processing adds bloom on bright practicals only, a cold grade, darkening grain, a vignette and SMAA anti-aliasing; SSAO only on High.
+- **Underground passage:** deliberately lopsided: service pipes, a sagging cable and a cable tray along one wall only, a peeling green dado and torn notices on the other, tiles fallen off in patches, rubble and a dead light fitting hanging over the walkway.
 - **Characters:** primitive-built humanoids. The Caller and the figures watching from the mist use a custom glitching spectral shader. In first person only the top of Aditi's phone shows at the bottom of the view; its torch (later a stronger flashlight) trails your aim slightly and dims near walls so it never whites out the screen.
 - **Prologue:** a 3D desk scene with a 1990s two-in-one radio-cassette player and a handwritten cassette, shot with depth of field.
 - **Audio:** all synthesised with Web Audio, through a station-sized convolution reverb and a master limiter.
-  - In play the mix is near silent: your footsteps, your own slow, cold, shivering breathing (quicker when running, ragged when hunted, held when hiding) and a low whistling wind. The score and the extra ambience only play in menus and the prologue.
+  - In play the mix is near silent: your footsteps, your own breathing (synthesised from pink-noise airflow through nose and mouth resonances: calm nasal in-breaths, open-mouth gasps when running, in-breaths that catch when frightened, a faint voiced "hah" under strain, and every breath a little different) and a low whistling wind. The score and the extra ambience only play in menus and the prologue.
   - Menu ambience: wind through the shed, distant Kolkata traffic and horns, crickets, drips, a far-off train horn and dogs howling.
   - Voices: formant-synthesised screams (woman, man, through a telephone), the Caller's ring-modulated shriek, and moans.
   - Score: a detuned tanpura (Karplus-Strong), dissonant strings, trembling high strings, and dhol/tasha chase percussion with a Shepard tone during hunts.

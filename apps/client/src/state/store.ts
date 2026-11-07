@@ -1,5 +1,5 @@
 import type { Room } from '@colyseus/sdk';
-import { createProfile, type GhostAbilityId, type MatchSummary, type ObjectiveId, type PlayerProfile, type ProgressionUpdate } from '@nishi/shared';
+import { createProfile, type StoryBeatId, type GhostAbilityId, type MatchSummary, type ObjectiveId, type PlayerProfile, type ProgressionUpdate } from '@nishi/shared';
 import { create } from 'zustand';
 import type { GameSession } from '../game/session';
 import { profileRepository } from './profile';
@@ -56,12 +56,14 @@ export interface HudState {
     time: number;
   } | null;
   downedNearby: string | null;
+  /** where the next task is: step text, bearing relative to the view (rad), route distance (m) */
+  guide: { step: string; angle: number; dist: number; vertical: 'up' | 'down' | null } | null;
 }
 
 const EMPTY_HUD: HudState = {
   prompt: null, zone: '', clock: '03:13', stamina: 1, exhausted: false, flashlight: false, hasFlashlight: false,
   abilityName: '', abilityLeft: 0, abilityCooldown: 1, abilityActive: false, hiding: false, status: 'alive', bleedout: 0,
-  reviveProgress: 0, signal: 0, objective: 'flashlight', echo: [], teammates: [], ghost: null, downedNearby: null,
+  reviveProgress: 0, signal: 0, objective: 'flashlight', echo: [], teammates: [], ghost: null, downedNearby: null, guide: null,
 };
 
 export type StartRequest = { kind: 'solo' } | { kind: 'multi'; room: Room };
@@ -83,6 +85,10 @@ interface AppState {
   chatLog: { id: number; from: string; text: string; fake?: boolean; at: number }[];
   hud: HudState;
   end: { summary: MatchSummary; progression: ProgressionUpdate | null; won: boolean } | null;
+  /** story beats reached this match, in order (the journal's "story so far") */
+  storyLog: StoryBeatId[];
+  /** beats waiting to be shown as story cards; the first one is on screen */
+  storyQueue: { id: StoryBeatId; until: number }[];
 
   go(screen: Screen): void;
   openSettings(from: Screen): void;
@@ -96,6 +102,8 @@ interface AppState {
   chat(from: string, text: string, fake?: boolean): void;
   setHud(h: Partial<HudState>): void;
   resetGameUi(): void;
+  beat(id: StoryBeatId): void;
+  popStory(): void;
 }
 
 let uid = 1;
@@ -117,6 +125,8 @@ export const useApp = create<AppState>((set, get) => ({
   chatLog: [],
   hud: EMPTY_HUD,
   end: null,
+  storyLog: [],
+  storyQueue: [],
 
   go: (screen) => set({ screen }),
   openSettings: (from) => set({ screen: 'settings', settingsReturn: from }),
@@ -151,7 +161,12 @@ export const useApp = create<AppState>((set, get) => ({
   },
   chat: (from, text, fake) => set({ chatLog: [...get().chatLog, { id: uid++, from, text, fake, at: performance.now() }].slice(-30) }),
   setHud: (h) => set({ hud: { ...get().hud, ...h } }),
-  resetGameUi: () => set({ overlay: null, doc: null, subtitles: [], toasts: [], radioLog: [], chatLog: [], hud: EMPTY_HUD, end: null }),
+  resetGameUi: () => set({ overlay: null, doc: null, subtitles: [], toasts: [], radioLog: [], chatLog: [], hud: EMPTY_HUD, end: null, storyLog: [], storyQueue: [] }),
+  popStory: () => set({ storyQueue: get().storyQueue.slice(1) }),
+  beat: (id) => {
+    if (get().storyLog.includes(id)) return;
+    set({ storyLog: [...get().storyLog, id], storyQueue: [...get().storyQueue, { id, until: 0 }] });
+  },
 }));
 
 /** Non-reactive accessor for hot paths (render loop, input handlers). */

@@ -20,6 +20,7 @@ import { Effects } from './Effects';
 import { GhostController } from './GhostController';
 import { Interactables } from './Interactables';
 import { LevelColliders, LevelMeshes, makeMaterials } from './Level';
+import { PassageDetail } from './Passage';
 import { LightRig } from './Lights';
 import { SurvivorController } from './SurvivorController';
 import { cachedTextures } from './textures';
@@ -52,7 +53,7 @@ function SceneSetup() {
 /** Everything visible about the station, shared by the menu backdrop and the game. */
 function StationWorld({ level, withPhysics, gp }: { level: LevelDef; withPhysics: boolean; gp: GraphicsProfile }) {
   const lib = cachedTextures();
-  const materials = useMemo(() => makeMaterials(lib ?? {}), [lib]);
+  const materials = useMemo(() => makeMaterials(lib ?? {}, gp.tier !== 'mobile'), [lib, gp.tier]);
   return (
     <>
       <SceneSetup />
@@ -63,6 +64,7 @@ function StationWorld({ level, withPhysics, gp }: { level: LevelDef; withPhysics
         <StationArchitecture shadows={gp.shadows} />
         <Train shadows={gp.shadows} />
         <Props lights={gp.propLights} />
+        <PassageDetail />
       </StaticBatch>
       <LightRig level={level} pool={gp.lightPool} shafts={gp.shafts} />
       <MistBanks density={gp.mist} />

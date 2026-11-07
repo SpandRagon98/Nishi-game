@@ -77,6 +77,9 @@ const BLEEDOUT = 45;
 const SOLO_GRACE = 100;
 const MP_GRACE = 60;
 
+/** speed multiplier while Kabir's Adrenaline is active */
+export const ADRENALINE_BOOST = 1.3;
+
 export class MatchSimulation {
   readonly level: LevelDef;
   readonly mode: Mode;
@@ -276,15 +279,18 @@ export class MatchSimulation {
     }
     const p = { x: m.x, y: m.y, z: m.z };
     const elapsed = Math.max(this.time - s.lastMoveAt, 0.05);
+    // sprinting never runs out (players found the stamina slowdown frustrating); Adrenaline adds a burst
+    const sprintOk = true;
     const stats = survivorById(s.characterId).stats;
-    const sprintOk = !s.exhausted || this.time - s.exhaustedAt < 0.6;
-    const speed = (s.flags & FLAG_SPRINT) && sprintOk ? stats.sprint : stats.walk;
+    const boost = this.time < s.staminaFreeUntil ? ADRENALINE_BOOST : 1;
+    const speed = ((s.flags & FLAG_SPRINT) && sprintOk ? stats.sprint : stats.walk) * boost;
     const horiz = dist2D(p, s.lastValid);
     const rise = p.y - s.lastValid.y;
     const blockers = this.blockers();
     const ok =
       withinBounds(this.level, p) &&
-      horiz <= speed * 1.3 * elapsed + 0.4 &&
+      // generous: frame hitches batch moves together, and a rejected move feels like being yanked back
+      horiz <= speed * 1.6 * elapsed + 1.2 &&
       rise <= 3 * elapsed + 0.5 &&
       (!penetratesWalls(this.level, p, 0.12, blockers) || penetratesWalls(this.level, s.lastValid, 0.12, blockers));
     if (!ok) {
@@ -598,8 +604,7 @@ export class MatchSimulation {
       if (this.ghost.apparition && this.ghost.apparition.until > this.time) points.push({ pos: copyV(this.ghost.apparition.pos), kind: 'apparition' });
       this.emit({ type: 'echo_sense', points, duration: def.duration, to: [id] });
     } else if (def.id === 'adrenaline') {
-      s.stamina = 1;
-      s.exhausted = false;
+      // a burst of speed for the ability's duration (staminaFreeUntil doubles as the boost timer)
       s.staminaFreeUntil = this.time + def.duration;
     }
     this.emit({ type: 'ability', ability: def.id, ok: true, to: [id] });
@@ -850,19 +855,12 @@ export class MatchSimulation {
 
   private updateSurvivors(dt: number) {
     for (const s of this.survivors.values()) {
-      const stats = survivorById(s.characterId).stats;
       if (s.status === 'alive' && !s.hiding) {
         const moving = !!(s.flags & FLAG_MOVING);
-        const sprinting = moving && !!(s.flags & FLAG_SPRINT) && !s.exhausted;
-        if (sprinting && this.time >= s.staminaFreeUntil) s.stamina -= dt / stats.sprintSeconds;
-        else if (!sprinting) s.stamina += dt * (moving ? 0.1 : 0.16);
-        if (s.stamina <= 0) {
-          s.stamina = 0;
-          if (!s.exhausted) s.exhaustedAt = this.time;
-          s.exhausted = true;
-        }
-        if (s.exhausted && s.stamina > 0.35) s.exhausted = false;
-        s.stamina = clamp(s.stamina, 0, 1);
+        const sprinting = moving && !!(s.flags & FLAG_SPRINT);
+        // unlimited sprint: stamina stays full and nobody is ever slowed to a walk
+        s.stamina = 1;
+        s.exhausted = false;
         s.noise = !moving ? 0 : sprinting ? 1 : s.flags & FLAG_CROUCH ? 0.12 : 0.35;
         if (this.world.exitOpen && inRect(s.pos, this.level.escapeZone) && s.pos.y > -0.5) {
           s.status = 'escaped';

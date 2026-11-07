@@ -1,5 +1,5 @@
 import {
-  ACHIEVEMENTS, DOCUMENTS, FUSE_LABELS, FUSE_VALUES, GHOST_ABILITIES, OBJECTIVES, RADIO_PRESETS, SURVIVORS, logbookText,
+  ACHIEVEMENTS, DOCUMENTS, FUSE_LABELS, FUSE_VALUES, GHOST_ABILITIES, OBJECTIVES, RADIO_PRESETS, STORY_BEATS, SURVIVORS, logbookText,
   type GhostAbilityId, type WorldSnapshot,
 } from '@nishi/shared';
 import { useEffect, useRef, useState } from 'react';
@@ -140,6 +140,50 @@ function FpsMeter() {
   );
 }
 
+/** Top-centre marker: which way the next task is, how far, and exactly what to do there. */
+function GuideMarker() {
+  const g = useApp((s) => s.hud.guide);
+  const hidden = useApp((s) => s.hud.hiding || s.hud.status !== 'alive');
+  if (!g || hidden) return null;
+  const ahead = Math.abs(g.angle) < 0.35;
+  return (
+    <div className="guide">
+      <div className="guide-arrow" style={{ transform: `rotate(${-g.angle}rad)` }} aria-hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 3 L19 19 L12 15 L5 19 Z" fill="currentColor" /></svg>
+      </div>
+      <div className="guide-text">
+        <div className="guide-step">{g.step}</div>
+        <div className="guide-dist">
+          {Math.max(1, Math.round(g.dist))} m{g.vertical === 'down' ? ' · take the stairs down' : g.vertical === 'up' ? ' · take the stairs up' : ahead ? ' · straight ahead' : ''}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A story beat, shown as a card on the left for a few seconds, then kept in the journal. */
+function StoryCard() {
+  const head = useApp((s) => s.storyQueue[0]);
+  const pop = useApp((s) => s.popStory);
+  useEffect(() => {
+    if (!head) return;
+    const b = STORY_BEATS[head.id];
+    const ms = Math.min(15000, 6000 + 45 * (b.text.length + (b.next?.length ?? 0)));
+    const id = setTimeout(pop, ms);
+    return () => clearTimeout(id);
+  }, [head, pop]);
+  if (!head) return null;
+  const b = STORY_BEATS[head.id];
+  return (
+    <div className="story-card" key={head.id}>
+      <div className="story-kicker">The story</div>
+      <h3>{b.title}</h3>
+      <p>{b.text}</p>
+      {b.next && <div className="story-next"><span>Next</span>{b.next}</div>}
+    </div>
+  );
+}
+
 function SurvivorHud() {
   const h = useApp((s) => s.hud);
   const obj = OBJECTIVES.find((o) => o.id === h.objective);
@@ -160,6 +204,7 @@ function SurvivorHud() {
           <>
             <div className="kicker">Objective</div>
             <div className="hud-objective">{obj.title}</div>
+            <div className="hud-hint">{obj.hint}</div>
           </>
         )}
       </div>
@@ -172,6 +217,8 @@ function SurvivorHud() {
         </div>
       </div>
       {zoneShown && <div className="zone-name" key={zoneShown}>{zoneShown}</div>}
+      <GuideMarker />
+      <StoryCard />
       <div className="crosshair" />
       {h.prompt && (
         <div className="prompt">
@@ -188,11 +235,6 @@ function SurvivorHud() {
         </div>
       )}
       <div className="hud-bl">
-        {(h.stamina < 0.99 || h.exhausted) && (
-          <div className="stamina">
-            <Meter value={h.stamina} tone={h.exhausted ? 'crimson' : 'neutral'} label="Stamina" />
-          </div>
-        )}
         <div className="hud-status">
           <span className={h.flashlight ? 'on' : ''}><kbd>F</kbd> {h.hasFlashlight ? 'Flashlight' : 'Phone torch'}</span>
           <span className={h.abilityActive ? 'on' : h.abilityLeft > 0 ? 'off' : ''}>
@@ -275,6 +317,7 @@ function GhostHud() {
 function Journal({ session }: { session: GameSession }) {
   const snap = useSnapshot(session, 300);
   const log = useApp((s) => s.radioLog);
+  const story = useApp((s) => s.storyLog);
   if (!snap) return null;
   const w = snap.world;
   const me = snap.survivors.find((s) => s.id === session.localId);
@@ -316,6 +359,13 @@ function Journal({ session }: { session: GameSession }) {
           </ul>
         </section>
         <section>
+          <h3>The story so far</h3>
+          <div className="story-log">
+            {story.length === 0 && <p className="muted">Nothing yet.</p>}
+            {story.map((id) => (
+              <p key={id}><b>{STORY_BEATS[id].title}.</b> {STORY_BEATS[id].text}</p>
+            ))}
+          </div>
           <h3>Radio log</h3>
           <div className="radio-log">
             {log.slice(-10).map((l) => (
@@ -385,7 +435,11 @@ function FusePuzzle({ session }: { session: GameSession }) {
           </Btn>
           <Btn onClick={closeOverlay}>Step away (Esc)</Btn>
         </div>
-        {!w.fuse.clue && <p className="muted small">Somebody must have written down the ratings. The station master kept a log.</p>}
+        {w.fuse.clue ? (
+          <p className="puzzle-help">From the logbook: {w.fuse.clue.map((v, i) => `${FUSE_LABELS[i]} ${v}A`).join(' · ')}</p>
+        ) : (
+          <p className="muted small">Somebody must have written down the ratings. The station master's logbook, in the office.</p>
+        )}
       </div>
     </div>
   );
@@ -446,9 +500,23 @@ function Keypad({ session }: { session: GameSession }) {
         <div className="row">
           <Btn onClick={closeOverlay}>Step away (Esc)</Btn>
         </div>
-        <p className="muted small">Check your journal (Tab) for the reel numbers and the announced order.</p>
+        <KeypadHelp w={w} />
       </div>
     </div>
+  );
+}
+
+function KeypadHelp({ w }: { w: WorldSnapshot['world'] }) {
+  const reels = (['reel_a', 'reel_b', 'reel_c'] as const).filter((r) => w.collected.includes(r));
+  if (!reels.length) return <p className="muted small">The numbers are on the three SHUNYA reels.</p>;
+  return (
+    <p className="puzzle-help">
+      Your reels: {reels.map((r) => `${r.slice(-1).toUpperCase()} = ${w.reelDigits[r]}`).join(' · ')}
+      <br />
+      {w.decodeOrder
+        ? `Announced order: reel ${w.decodeOrder.join(' → ')}${reels.length === 3 ? ` → enter ${w.decodeOrder.map((r) => w.reelDigits[`reel_${r.toLowerCase()}` as 'reel_a']).join('')}` : ''}`
+        : 'Wait for the announcement to call out the order.'}
+    </p>
   );
 }
 
@@ -615,6 +683,12 @@ export function GameView() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   const sceneReady = useApp((s) => !!s.hud.zone);
+  // the chapter opens on its first story card once the station is on screen
+  useEffect(() => {
+    if (!sceneReady || !session || session.role === 'ghost') return;
+    const id = setTimeout(() => useApp.getState().beat('arrival'), 1200);
+    return () => clearTimeout(id);
+  }, [sceneReady, session]);
   if (!session) return null;
   return (
     <div className="game">

@@ -74,6 +74,20 @@ export function Loading() {
         <div className="kicker">Chapter {chapter.index} · {chapter.location}</div>
         <h1 className="loading-title">{chapter.title}</h1>
         <p className="loading-line" key={line}>{chapter.loadingLines[line]}</p>
+        <section className="loading-story" aria-label="The story so far">
+          <h2>The story so far</h2>
+          <p>
+            In 1999 your mother, <b>Mrinalini Sen</b>, walked into Nishipur Junction with SHUNYA field unit 4 and never came out.
+            Tonight her cassette said she is <i>still on the platform</i>, and that something there copies voices.
+          </p>
+          <h2>Your goal tonight</h2>
+          <ol>
+            <li>Find a light, then search the station master's office.</li>
+            <li>Recover her three hidden audio reels.</li>
+            <li>Restore the power, decode the announcement, open the exit.</li>
+          </ol>
+          <p className="loading-warn">It will call your name. Do not let it call a third time.</p>
+        </section>
         <div className="loading-bar">
           <Meter value={progress} tone="crimson" />
           <span>{ready ? 'The station is waiting.' : progress < 1 ? 'Developing the reels…' : 'Threading the tape…'}</span>
@@ -81,8 +95,11 @@ export function Loading() {
         {ready && start?.kind !== 'multi' && <Btn primary onClick={begin}>Enter the station</Btn>}
         {ready && start?.kind === 'multi' && <p className="muted">Joining your team…</p>}
         <div className="controls-hint">
-          WASD move · Shift sprint · Ctrl/C crouch · E interact · F flashlight · Q ability · Tab journal · Esc pause
+          {[['WASD', 'move'], ['Shift', 'sprint'], ['C', 'crouch'], ['E', 'interact'], ['F', 'flashlight'], ['Q', 'ability'], ['Tab', 'journal'], ['Esc', 'pause']].map(([k, v]) => (
+            <span key={k}><kbd>{k}</kbd> {v}</span>
+          ))}
         </div>
+        <p className="loading-tip">The marker at the top of the screen always points to your next task.</p>
       </div>
     </div>
   );

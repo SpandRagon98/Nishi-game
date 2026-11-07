@@ -7,7 +7,71 @@ import { TEXTURE_SCALE, type TextureLibrary } from './textures';
 const METALNESS: Partial<Record<MaterialId, number>> = { rust: 0.35, metal: 0.6, corrugated: 0.45, carriage: 0.15 };
 const NORMAL_SCALE: Partial<Record<MaterialId, number>> = { ballast: 1.4, brick: 1, stone: 1.1, corrugated: 1.2, platform: 0.6 };
 
-export function makeMaterials(lib: TextureLibrary): Record<MaterialId, THREE.Material> {
+/** how strongly each surface shows vertical drip streaks (walls) and damp patches (floors) */
+const WEATHERING: Partial<Record<MaterialId, [streak: number, wet: number]>> = {
+  tile: [1, 1], plaster: [1, 0], brick: [0.8, 0], concrete: [0.7, 0.55], mosaic: [0.5, 0.6], stone: [0.8, 0.3],
+  platform: [0.4, 0.45], ceiling: [0.9, 0], corrugated: [0.6, 0], rust: [0.4, 0], wood: [0.2, 0],
+};
+
+/**
+ * World-space weathering layered over the tiling textures, so no two metres of wall look alike:
+ * large grime blotches, finer mottling, rust-brown drip streaks running down walls from the ceiling,
+ * and damp floor patches that turn dark and glossy. A few cheap value-noise lookups per pixel.
+ */
+function weather(m: THREE.MeshStandardMaterial, streak: number, wet: number) {
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uStreak = { value: streak };
+    shader.uniforms.uWet = { value: wet };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
+      .replace(
+        '#include <worldpos_vertex>',
+        '#include <worldpos_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWNrm = normalize(mat3(modelMatrix) * objectNormal);',
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vWPos;
+varying vec3 vWNrm;
+uniform float uStreak;
+uniform float uWet;
+float wHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float wNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(wHash(i), wHash(i + vec2(1.0, 0.0)), f.x), mix(wHash(i + vec2(0.0, 1.0)), wHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float wDamp = 0.0;`,
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+{
+  vec3 wp = vWPos;
+  float wall = 1.0 - abs(vWNrm.y);
+  // along-wall coordinate, whichever way the wall faces
+  float u = abs(vWNrm.x) > abs(vWNrm.z) ? wp.z : wp.x;
+  vec2 q = mix(wp.xz, vec2(u, wp.y), wall);
+  float big = wNoise(q * 0.23 + 7.3);
+  float fine = wNoise(q * 1.1 + 2.1);
+  float grime = mix(0.6, 1.06, smoothstep(0.18, 0.82, big)) * mix(0.84, 1.0, fine);
+  // drips: thin columns that are long in y and fade in and out along their length
+  float col = wNoise(vec2(u * 3.1, wp.y * 0.22 + 4.0));
+  float drip = smoothstep(0.62, 0.86, col) * wNoise(vec2(u * 0.6, 1.7)) * wall * uStreak;
+  diffuseColor.rgb = mix(diffuseColor.rgb * grime, diffuseColor.rgb * vec3(0.5, 0.42, 0.34), drip * 0.75);
+  // damp patches on floors
+  float floorK = smoothstep(0.7, 0.95, vWNrm.y);
+  wDamp = smoothstep(0.58, 0.7, wNoise(wp.xz * 0.3 + 11.0) * 0.75 + fine * 0.25) * floorK * uWet;
+  diffuseColor.rgb *= 1.0 - wDamp * 0.35;
+}`,
+      )
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.14, wDamp);');
+  };
+}
+
+export function makeMaterials(lib: TextureLibrary, detail = true): Record<MaterialId, THREE.Material> {
   const out = {} as Record<MaterialId, THREE.Material>;
   for (const id of Object.keys(TEXTURE_SCALE) as MaterialId[]) {
     if (id === 'darkness') {
@@ -25,6 +89,10 @@ export function makeMaterials(lib: TextureLibrary): Record<MaterialId, THREE.Mat
       metalness: METALNESS[id] ?? 0,
       envMapIntensity: id === 'platform' || id === 'mosaic' || id === 'tile' ? 1.2 : 0.5,
     });
+    if (detail) {
+      const [streak, wet] = WEATHERING[id] ?? [0.3, 0];
+      weather(out[id] as THREE.MeshStandardMaterial, streak, wet);
+    }
   }
   return out;
 }

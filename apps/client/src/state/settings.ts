@@ -20,6 +20,8 @@ export interface Settings {
   invertY: boolean;
   fov: number;
   showFps: boolean;
+  /** objective marker and next-step text in the HUD */
+  guidance: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -39,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   invertY: false,
   fov: 72,
   showFps: false,
+  guidance: true,
 };
 
 export const intensityValue = (i: HorrorIntensity) => (i === 'low' ? 0.6 : i === 'high' ? 1.4 : 1);

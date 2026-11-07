@@ -1,6 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { CapsuleCollider, RigidBody, useRapier, type RapierCollider, type RapierRigidBody } from '@react-three/rapier';
 import {
+  ADRENALINE_BOOST,
   FLAG_CROUCH, FLAG_FLASHLIGHT, FLAG_MOVING, FLAG_SPRINT, OBJECTIVES, forwardFromYawPitch, survivorById, zoneAt,
   type LevelDef, type Vec3,
 } from '@nishi/shared';
@@ -9,10 +10,13 @@ import * as THREE from 'three';
 import { audio } from '../audio/engine';
 import { fx, now } from '../game/fx';
 import { consumeMouse, isDown, matches } from '../game/input';
+import { guide } from '../game/guidance';
 import { runtime } from '../game/runtime';
 import type { GameSession } from '../game/session';
 import { findTarget, type Target } from '../game/targeting';
-import { app } from '../state/store';
+import { app, type HudState } from '../state/store';
+
+type HudGuide = HudState['guide'];
 import { lightLevels } from './Lights';
 import { torch } from './Atmosphere';
 import { HeldLight } from './HeldLight';
@@ -190,8 +194,10 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
       const len = Math.hypot(ix, iz);
       moving = len > 0;
       s.crouch = isDown('crouch');
-      sprinting = moving && isDown('sprint') && !s.crouch && !me.exhausted && iz < 0;
-      const speed = s.crouch ? def.stats.crouch : sprinting ? def.stats.sprint : def.stats.walk;
+      // sprint never tires out; Kabir's Adrenaline adds a burst on top
+      sprinting = moving && isDown('sprint') && !s.crouch;
+      const boost = def.ability.id === 'adrenaline' && me.abilityActiveUntil > snap.time ? ADRENALINE_BOOST : 1;
+      const speed = (s.crouch ? def.stats.crouch : sprinting ? def.stats.sprint : def.stats.walk) * boost;
       const sin = Math.sin(s.yaw);
       const cos = Math.cos(s.yaw);
       const vx = len ? ((ix * cos + iz * sin) / len) * speed : 0;
@@ -312,6 +318,14 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
           })
         : [];
       const objective = OBJECTIVES.find((o) => !snap.world.objectives[o.id])?.id ?? null;
+      let guideHud: HudGuide = null;
+      if (app().settings.guidance && alive) {
+        const gdn = guide(level, snap, { ...me, pos: feet });
+        if (gdn) {
+          const a = Math.atan2(-(gdn.heading.x - feet.x), -(gdn.heading.z - feet.z)) - s.yaw;
+          guideHud = { step: gdn.step, angle: Math.atan2(Math.sin(a), Math.cos(a)), dist: gdn.distance, vertical: gdn.vertical };
+        }
+      }
       app().setHud({
         prompt: hiding ? 'Leave the hiding place' : s.target?.label ?? null,
         zone: zone?.name ?? '',
@@ -334,6 +348,7 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
         teammates: snap.survivors.filter((x) => x.id !== me.id).map((x) => ({ id: x.id, name: x.name, status: x.status, characterId: x.characterId })),
         ghost: null,
         downedNearby: s.target?.kind === 'revive' ? s.target.id : null,
+        guide: guideHud,
       });
     }
   });

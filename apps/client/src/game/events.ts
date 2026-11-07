@@ -15,6 +15,8 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
   const voiceOn = s.settings.voiceLines;
   const snap = session.snapshot();
   const me = snap?.survivors.find((x) => x.id === session.localId);
+  // story cards are for the survivors' side of the tale
+  const story = session.role !== 'ghost';
 
   switch (e.type) {
     case 'message':
@@ -40,9 +42,14 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
     case 'phone':
       s.subtitle({ speaker: 'TELEPHONE', text: e.text, kind: 'phone' });
       speak(e.text.replace(/^[^"]*"|".*$/g, ''), { enabled: voiceOn, voice: 'female', rate: 0.85, pitch: 0.8 });
+      if (story) s.beat('phone');
       break;
     case 'pickup':
       s.toast({ title: e.label, text: e.detail, tone: 'good' }, e.item.startsWith('reel') ? 9000 : 5000);
+      if (story && e.item.startsWith('reel')) {
+        const heard = s.storyLog.filter((b) => b.startsWith('reel_')).length;
+        if (heard < 3) s.beat(`reel_${heard + 1}` as 'reel_1');
+      }
       break;
     case 'doc':
       releasePointer();
@@ -75,6 +82,7 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
       if (e.phase === 'warning') fx.huntPhase = 'warning';
       else if (e.phase === 'start') {
         fx.huntPhase = 'hunt';
+        if (story) s.beat('first_hunt');
         // the station goes dead quiet, then one distant shriek: the only warning
         audio.silence(1.1);
         setTimeout(() => audio.shriek(session.snapshot()?.ghost.pos, 0.22), 900);
@@ -104,8 +112,9 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
     }
     case 'objective': {
       const o = OBJECTIVES.find((x) => x.id === e.id)!;
-      const next = OBJECTIVES.find((x) => !session.snapshot()?.world.objectives[x.id]);
-      s.toast({ title: `✓ ${o.title}`, text: next ? `Next: ${next.title}` : undefined, tone: 'good' }, 5000);
+      const next = OBJECTIVES.find((x) => x.id !== e.id && !session.snapshot()?.world.objectives[x.id]);
+      s.toast({ title: `✓ ${o.title}`, text: next && !story ? `Next: ${next.title}` : undefined, tone: 'good' }, 3500);
+      if (story) s.beat(e.id);
       break;
     }
     case 'checkpoint':

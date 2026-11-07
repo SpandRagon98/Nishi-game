@@ -10,5 +10,5 @@ export * from './data/story';
 export * from './data/progression';
 export * from './sim/types';
 export * from './sim/director';
-export { MatchSimulation, type SimOptions, type InteractResult } from './sim/simulation';
+export { ADRENALINE_BOOST, MatchSimulation, type SimOptions, type InteractResult } from './sim/simulation';
 export * from './net';

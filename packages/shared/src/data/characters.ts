@@ -68,9 +68,9 @@ export const SURVIVORS: SurvivorDef[] = [
       "Kabir has pulled people from collapsed buildings and flooded subways. He signed on as the team's medic because the archive offered double pay. He does not believe in ghosts. He also has not slept since he heard the recording.",
     ability: {
       id: 'adrenaline', name: 'Adrenaline', key: 'Q', cooldown: 50, duration: 6,
-      description: 'Instantly refills stamina and removes sprint drain for 6 seconds.',
+      description: 'A burst of speed: sprint 30% faster for 6 seconds.',
     },
-    passive: 'Revives teammates 2.5x faster and has 25% more sprint endurance.',
+    passive: 'Revives teammates 2.5x faster.',
     stats: { ...BASE, sprint: 5.2, sprintSeconds: 7.5, reviveSeconds: 2 },
     palette: { coat: '#8a2f1f', accent: '#d8d2b4', trousers: '#26282c', skin: '#8d5e44', hair: '#0f0d0c' },
     unlock: { type: 'default' },

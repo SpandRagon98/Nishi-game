@@ -131,9 +131,10 @@ function Glint({ seed }: { seed: number }) {
   const m = useMemo(glintMat, []);
   useFrame(() => {
     const t = now();
-    const s = Math.max(0, Math.sin(t * 1.3 + seed)) ** 8;
-    m.opacity = 0.15 + s * 0.6;
-    ref.current?.scale.setScalar(0.12 + s * 0.12);
+    // a steady warm glow you can spot across a dark room, plus a slow catch-light pulse
+    const s = Math.max(0, Math.sin(t * 1.6 + seed)) ** 6;
+    m.opacity = 0.4 + s * 0.55;
+    ref.current?.scale.setScalar(0.2 + s * 0.16);
   });
   return <sprite ref={ref} material={m} position={[0, 0.08, 0]} />;
 }
