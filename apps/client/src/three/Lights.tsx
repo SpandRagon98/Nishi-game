@@ -65,19 +65,21 @@ const coneMaterial = () =>
     side: THREE.DoubleSide,
     uniforms: { uColor: { value: new THREE.Color() }, uOpacity: { value: 0 } },
     vertexShader: /* glsl */ `
-      varying float vH; varying float vEdge;
+      varying float vH; varying float vEdge; varying float vDepth;
       void main() {
         vH = uv.y;
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vDepth = -mv.z;
         vec3 n = normalize(normalMatrix * normal);
         vEdge = abs(dot(n, normalize(-mv.xyz)));
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
       uniform vec3 uColor; uniform float uOpacity;
-      varying float vH; varying float vEdge;
+      varying float vH; varying float vEdge; varying float vDepth;
       void main() {
-        float a = pow(vH, 1.6) * pow(vEdge, 1.4) * uOpacity;
+        // fade out as the camera gets close or walks through it, so it never washes the screen
+        float a = pow(max(vH, 1e-4), 1.6) * pow(max(vEdge, 1e-4), 1.4) * uOpacity * smoothstep(1.2, 4.5, vDepth);
         gl_FragColor = vec4(uColor * a, a);
       }`,
   });

@@ -168,7 +168,7 @@ export function spectralMaterial(glow = '#9fb8c8', base = '#06080a') {
       uniform float uTime; uniform float uOpacity; uniform vec3 uGlow; uniform vec3 uBase; uniform float uStun;
       varying vec3 vN; varying vec3 vV; varying float vY;
       void main() {
-        float rim = pow(1.0 - abs(dot(vN, vV)), 2.2);
+        float rim = pow(max(1.0 - abs(dot(vN, vV)), 1e-4), 2.2);
         float scan = 0.85 + 0.15 * sin(vY * 140.0 - uTime * 6.0);
         vec3 c = uBase + uGlow * rim * (1.2 + uStun * 2.0) * scan;
         gl_FragColor = vec4(c, uOpacity * (0.75 + rim * 0.5));
@@ -264,8 +264,8 @@ const beamMat = () =>
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    vertexShader: `varying float vH; void main(){ vH = uv.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-    fragmentShader: `varying float vH; void main(){ float a = pow(vH, 2.0) * 0.09; gl_FragColor = vec4(vec3(1.0,0.93,0.78)*a, a); }`,
+    vertexShader: `varying float vH; varying float vDepth; void main(){ vH = uv.y; vec4 mv = modelViewMatrix * vec4(position,1.0); vDepth = -mv.z; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying float vH; varying float vDepth; void main(){ float a = vH * vH * 0.09 * smoothstep(1.0, 4.0, vDepth); gl_FragColor = vec4(vec3(1.0,0.93,0.78)*a, a); }`,
   });
 
 function RemoteSurvivor({ id, ghostVision }: { id: string; ghostVision: boolean }) {

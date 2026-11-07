@@ -10,7 +10,7 @@ export function Horizon() {
         fog: false,
         vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
         fragmentShader: `varying vec2 vUv; void main(){
-          float g = pow(1.0 - vUv.y, 3.0);
+          float g = pow(max(1.0 - vUv.y, 1e-4), 3.0);
           vec3 c = mix(vec3(0.012,0.016,0.024), vec3(0.22,0.12,0.06), g);
           gl_FragColor = vec4(c, 1.0); }`,
       }),

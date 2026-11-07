@@ -300,12 +300,14 @@ const beamMaterial = () =>
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
     uniforms: { uI: { value: 1 } },
-    vertexShader: `varying float vH; varying float vEdge;
-      void main(){ vH = uv.y; vec4 mv = modelViewMatrix * vec4(position,1.0);
+    vertexShader: `varying float vH; varying float vEdge; varying float vDepth;
+      void main(){ vH = uv.y; vec4 mv = modelViewMatrix * vec4(position,1.0); vDepth = -mv.z;
         vec3 n = normalize(normalMatrix * normal); vEdge = abs(dot(n, normalize(-mv.xyz)));
         gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `uniform float uI; varying float vH; varying float vEdge;
-      void main(){ float a = pow(vH, 2.4) * pow(vEdge, 1.2) * 0.2 * uI; gl_FragColor = vec4(vec3(0.95, 0.97, 1.0) * a, a); }`,
+    // the beam is 30 m long and the platform runs through its wide end: anything near the camera
+    // fades away, otherwise the screen-clipped cone shows up as a flashing white slab
+    fragmentShader: `uniform float uI; varying float vH; varying float vEdge; varying float vDepth;
+      void main(){ float a = pow(max(vH, 1e-4), 2.4) * pow(max(vEdge, 1e-4), 1.2) * 0.12 * uI * smoothstep(4.0, 14.0, vDepth); gl_FragColor = vec4(vec3(0.95, 0.97, 1.0) * a, a); }`,
   });
 
 function glareMaterial() {
@@ -352,6 +354,9 @@ function Cab({ shadows, mats, body }: { shadows: boolean; mats: Record<string, T
     };
   }, [scene, spot]);
   const level = useRef(0.92);
+  const camera = useThree((s) => s.camera);
+  const beamRef = useRef<THREE.Mesh>(null);
+  const probe = useMemo(() => ({ apex: new THREE.Vector3(), dir: new THREE.Vector3(), v: new THREE.Vector3() }), []);
   useFrame((_, dt) => {
     const t = now();
     // the headlamp sags (never strobes) when the Caller hunts nearby or the platform browns out
@@ -362,7 +367,22 @@ function Cab({ shadows, mats, body }: { shadows: boolean; mats: Record<string, T
     level.current = THREE.MathUtils.damp(level.current, target, 1.6, Math.min(dt, 0.1));
     const k = level.current;
     spot.intensity = 150 * k;
-    beam.uniforms.uI.value = k * 0.8;
+    // fade the whole beam when the camera is in or near it: seen from inside, an additive cone just
+    // smears the screen white
+    let near = 1;
+    const bm = beamRef.current;
+    if (bm) {
+      bm.updateWorldMatrix(true, false);
+      probe.dir.set(0, 1, 0).transformDirection(bm.matrixWorld); // towards the apex
+      probe.apex.setFromMatrixPosition(bm.matrixWorld).addScaledVector(probe.dir, 15);
+      probe.dir.negate();
+      probe.v.copy(camera.position).sub(probe.apex);
+      const along = THREE.MathUtils.clamp(probe.v.dot(probe.dir), 0, 30);
+      const off = probe.v.addScaledVector(probe.dir, -along).length();
+      const outside = off - (along / 30) * 4.6;
+      near = THREE.MathUtils.smoothstep(outside, 2.5, 7);
+    }
+    beam.uniforms.uI.value = k * 0.8 * near;
     if (lamp.current) lamp.current.emissiveIntensity = 12 * k;
     glare.opacity = 0.55 * k;
     glareRef.current?.scale.setScalar(2.1 * (0.6 + 0.4 * k));
@@ -408,7 +428,8 @@ function Cab({ shadows, mats, body }: { shadows: boolean; mats: Record<string, T
         <meshStandardMaterial ref={lamp} color="#ffffff" emissive="#eef5ff" emissiveIntensity={16} />
       </mesh>
       <sprite ref={glareRef} material={glare} position={[x - 0.8, 2.98, Z]} scale={[2.6, 2.6, 1]} />
-      <mesh material={beam} position={[x - 0.7 - beamLen / 2, 2.6, Z - 0.3]} rotation={[0, 0, Math.PI / 2 + 0.05]}>
+      {/* apex at the lamp, widening down the track (cone +y points back at the lamp) */}
+      <mesh ref={beamRef} material={beam} position={[x - 0.7 - beamLen / 2, 2.6, Z - 0.3]} rotation={[0, 0, -Math.PI / 2 + 0.05]}>
         <coneGeometry args={[4.6, beamLen, 28, 1, true]} />
       </mesh>
       {/* marker and tail lamps, horns, buffers, coupler */}
@@ -470,7 +491,8 @@ function Coach({ c, mats, shadows }: { c: CoachSpec; mats: Record<string, THREE.
   useFrame(() => {
     if (!glow.current) return;
     const t = now();
-    glow.current.emissiveIntensity = 0.75 + Math.sin(t * 0.4) * 0.12;
+    // one weak tube left burning inside: a faint, steady teal glow, never a bright panel
+    glow.current.emissiveIntensity = 0.2 + Math.sin(t * 0.4) * 0.03;
   });
   const roofH = 0.34;
   return (
@@ -524,7 +546,7 @@ function Coach({ c, mats, shadows }: { c: CoachSpec; mats: Record<string, THREE.
         <mesh position={[cx, 1.3, Z]}>
           <boxGeometry args={[L - 0.2, 2.5, HALF_W * 2 - 0.25]} />
           {c.lit ? (
-            <meshStandardMaterial ref={glow} color="#0a0d0e" emissive="#9fc7d1" emissiveIntensity={0.9} side={THREE.BackSide} />
+            <meshStandardMaterial ref={glow} color="#0a0d0e" emissive="#6f9aa3" emissiveIntensity={0.22} side={THREE.BackSide} />
           ) : (
             <meshStandardMaterial color="#050606" side={THREE.BackSide} />
           )}

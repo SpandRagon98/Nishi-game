@@ -137,13 +137,13 @@ const shaftMat = () =>
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
     uniforms: { uTime: { value: 0 } },
-    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `uniform float uTime; varying vec2 vUv;
+    vertexShader: 'varying vec2 vUv; varying float vDepth; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position,1.0); vDepth = -mv.z; gl_Position = projectionMatrix * mv; }',
+    fragmentShader: `uniform float uTime; varying vec2 vUv; varying float vDepth;
       void main(){
         float edge = smoothstep(0.0, 0.35, vUv.x) * smoothstep(1.0, 0.65, vUv.x);
         float fall = smoothstep(0.0, 0.25, vUv.y) * (0.35 + 0.65 * vUv.y);
         float flick = 0.85 + 0.15 * sin(uTime * 0.7 + vUv.x * 9.0);
-        float a = edge * fall * 0.075 * flick;
+        float a = edge * fall * 0.075 * flick * smoothstep(2.0, 7.0, vDepth);
         gl_FragColor = vec4(vec3(0.55, 0.78, 0.82) * a, a);
       }`,
   });

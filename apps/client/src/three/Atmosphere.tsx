@@ -53,9 +53,9 @@ export function makeNightEnvironment(gl: THREE.WebGLRenderer) {
           vec3 c = mix(vec3(0.02,0.035,0.04), vec3(0.09,0.2,0.22), smoothstep(-0.3, 0.05, y));
           c = mix(c, vec3(0.03,0.07,0.08), smoothstep(0.05, 0.8, y));
           float m = max(dot(vDir, uMoon), 0.0);
-          c += vec3(0.55,0.75,0.78) * pow(m, 400.0) * 6.0 + vec3(0.1,0.18,0.2) * pow(m, 12.0);
+          c += vec3(0.55,0.75,0.78) * pow(max(m, 1e-4), 400.0) * 6.0 + vec3(0.1,0.18,0.2) * pow(max(m, 1e-4), 12.0);
           // warm sodium lamps along the horizon
-          float lamps = pow(max(0.0, 1.0 - abs(y + 0.02) * 20.0), 3.0) * (0.5 + 0.5 * sin(vDir.x * 40.0));
+          float lamps = pow(max(1e-4, 1.0 - abs(y + 0.02) * 20.0), 3.0) * (0.5 + 0.5 * sin(vDir.x * 40.0));
           c += vec3(0.5, 0.28, 0.08) * lamps * 0.6;
           gl_FragColor = vec4(c, 1.0);
         }`,
