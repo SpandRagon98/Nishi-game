@@ -4,6 +4,7 @@ import { GHOST_ABILITIES, GHOST_SPEED, forwardFromYawPitch, zoneAt, type GhostAb
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { audio } from '../audio/engine';
+import { music } from '../audio/music';
 import { now } from '../game/fx';
 import { consumeMouse, isDown, matches } from '../game/input';
 import { runtime } from '../game/runtime';
@@ -138,6 +139,11 @@ export function GhostController({ session, level }: { session: GameSession; leve
       b.setTranslation({ x: g.pos.x, y: g.pos.y + CENTER, z: g.pos.z }, true);
     }
     const m = consumeMouse();
+    if (import.meta.env.DEV && runtime.debugLook) {
+      s.yaw = runtime.debugLook.yaw;
+      s.pitch = runtime.debugLook.pitch;
+      runtime.debugLook = null;
+    }
     if (!app().overlay || app().overlay === 'journal') {
       const k = 0.0021 * settings.mouseSensitivity;
       s.yaw -= m.dx * k;
@@ -182,6 +188,7 @@ export function GhostController({ session, level }: { session: GameSession; leve
       s.lastHud = tn;
       const zone = zoneAt(level, feet);
       audio.updateAmbience({ indoor: !!zone?.indoor, underground: feet.y < -1.5, hum: 0, ghostDist: 99, hunting: false, signalRange: 1 });
+      music.setMood(g.mode === 'hunt' || g.mode === 'warn' ? 'hunt' : 'tension');
       const readyIn = Object.fromEntries(
         (Object.keys(GHOST_ABILITIES) as GhostAbilityId[]).map((id) => [id, Math.max(0, (g.readyAt[id] ?? 0) - snap.time)]),
       ) as Record<GhostAbilityId, number>;

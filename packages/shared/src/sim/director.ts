@@ -16,7 +16,8 @@ export type HorrorEventId =
   | 'announcement_change'
   | 'radio_whisper'
   | 'private_apparition'
-  | 'train_creak';
+  | 'train_creak'
+  | 'distant_scream';
 
 export interface DirectorSurvivor {
   id: string;
@@ -61,6 +62,7 @@ export interface HorrorEventDef {
 
 export const HORROR_EVENTS: HorrorEventDef[] = [
   { id: 'train_creak', priority: 1, weight: 1, cooldown: 40, minThreat: 0, minProgress: 0 },
+  { id: 'distant_scream', priority: 3, weight: 0.7, cooldown: 120, minThreat: 22, minProgress: 2 },
   { id: 'lights_flicker', priority: 2, weight: 1.2, cooldown: 30, minThreat: 0, minProgress: 0, bias: (c) => (c.power ? 1.3 : 1) },
   {
     id: 'footsteps', priority: 2, weight: 1, cooldown: 45, minThreat: 8, minProgress: 0,

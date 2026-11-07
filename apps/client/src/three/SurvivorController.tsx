@@ -7,6 +7,7 @@ import {
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { audio } from '../audio/engine';
+import { music } from '../audio/music';
 import { fx, now } from '../game/fx';
 import { consumeMouse, isDown, matches } from '../game/input';
 import { runtime } from '../game/runtime';
@@ -14,6 +15,8 @@ import type { GameSession } from '../game/session';
 import { findTarget, type Target } from '../game/targeting';
 import { app } from '../state/store';
 import { lightLevels } from './Lights';
+import { torch } from './Atmosphere';
+import { HeldLight } from './HeldLight';
 
 const HALF = 0.55;
 const RADIUS = 0.3;
@@ -49,7 +52,7 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
 
   const st = useRef({
     yaw: -Math.PI / 2, pitch: 0, vy: 0, eye: EYE, flash: false, crouch: false, stride: 0, bob: 0,
-    lastHud: 0, target: null as Target | null, reviving: null as string | null, lastStep: 0, spawned: false,
+    lastHud: 0, target: null as Target | null, reviving: null as string | null, lastStep: 0, spawned: false, nextMoan: 0,
   });
 
   // flashlight
@@ -98,7 +101,6 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
           session.revive(t.id);
         } else session.interact(t.id);
       } else if (matches('flashlight', e.code)) {
-        if (!me.hasFlashlight) return s.toast({ title: 'You have no flashlight yet.', tone: 'warn' }, 1500);
         st.current.flash = !st.current.flash;
         audio.sfx('locked');
       } else if (matches('ability', e.code)) {
@@ -126,6 +128,8 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
   }, [session]);
 
   const tmpE = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), []);
+  const held = useRef({ on: false, strong: false, intensity: 1, moving: false, sprinting: false, hidden: false });
+  const skin = survivorById(session.snapshot()?.survivors.find((x) => x.id === session.localId)?.characterId ?? 'aditi').palette.skin;
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -147,6 +151,11 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
 
     // look
     const m = consumeMouse();
+    if (import.meta.env.DEV && runtime.debugLook) {
+      s.yaw = runtime.debugLook.yaw;
+      s.pitch = runtime.debugLook.pitch;
+      runtime.debugLook = null;
+    }
     if (!overlay || overlay === 'journal') {
       const k = 0.0021 * settings.mouseSensitivity;
       s.yaw -= m.dx * k;
@@ -227,12 +236,23 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     // flashlight: follows the view with a little lag; stutters when the Caller is close
     const g = snap.ghost;
     const gd = Math.hypot(g.pos.x - feet.x, g.pos.y - feet.y, g.pos.z - feet.z);
-    const flashOn = s.flash && me.hasFlashlight;
+    // the found flashlight is a proper beam; before that, Aditi's phone torch
+    const flashOn = s.flash;
+    const strong = me.hasFlashlight;
     const stutter = gd < 10 && (g.mode === 'hunt' || g.mode === 'warn') ? (Math.random() < 0.25 ? 0.15 : 1) : 1;
-    spot.intensity = flashOn ? 38 * stutter : 0;
-    spot.position.copy(camera.position).add(new THREE.Vector3(0.18, -0.2, 0).applyQuaternion(camera.quaternion));
+    spot.intensity = flashOn ? (strong ? 52 : 11) * stutter : 0;
+    spot.distance = strong ? 34 : 12;
+    spot.angle = strong ? 0.36 : 0.68;
+    spot.penumbra = strong ? 0.45 : 0.9;
+    spot.position.copy(camera.position).add(new THREE.Vector3(0.24, -0.26, -0.75).applyQuaternion(camera.quaternion));
     spot.target.position.set(camera.position.x + fwd.x * 6, camera.position.y + fwd.y * 6, camera.position.z + fwd.z * 6);
     spot.target.updateMatrixWorld();
+    torch.on = flashOn;
+    torch.strength = stutter * (strong ? 1 : 0.45);
+    torch.pos.copy(spot.position);
+    torch.dir.set(fwd.x, fwd.y, fwd.z);
+    torch.cos = Math.cos(strong ? 0.3 : 0.55);
+    held.current = { on: flashOn, strong, intensity: stutter, moving, sprinting, hidden: !!hiding || !alive };
 
     // interaction target
     s.target = alive && !hiding ? findTarget(level, snap, me, runtime.eye, fwd) : null;
@@ -257,6 +277,13 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
         indoor: !!zone?.indoor, underground: feet.y < -1.5, hum: hum * 0.9, ghostDist: gd,
         hunting: g.mode === 'hunt' || g.mode === 'warn', signalRange,
       });
+      const hunting = g.mode === 'hunt' || g.mode === 'warn' || g.mode === 'stunned';
+      music.setMood(snap.ended ? 'silent' : hunting ? 'hunt' : gd < signalRange * 0.75 ? 'tension' : 'explore');
+      // something breathing just out of sight
+      if (!hunting && gd < 14 && tn > s.nextMoan) {
+        s.nextMoan = tn + 9 + Math.random() * 10;
+        audio.moan({ x: g.pos.x, y: g.pos.y + 1.6, z: g.pos.z }, 0.18);
+      }
       const ability = def.ability;
       const echo = fx.echoSense.until > tn
         ? fx.echoSense.points.map((p) => {
@@ -292,8 +319,11 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
   });
 
   return (
-    <RigidBody ref={body} type="kinematicPosition" colliders={false} enabledRotations={[false, false, false]}>
-      <CapsuleCollider ref={collider} args={[HALF, RADIUS]} />
-    </RigidBody>
+    <>
+      <RigidBody ref={body} type="kinematicPosition" colliders={false} enabledRotations={[false, false, false]}>
+        <CapsuleCollider ref={collider} args={[HALF, RADIUS]} />
+      </RigidBody>
+      <HeldLight state={held} skin={skin} />
+    </>
   );
 }

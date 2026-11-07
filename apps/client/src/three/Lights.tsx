@@ -2,15 +2,32 @@ import { useFrame } from '@react-three/fiber';
 import type { LightDef, LevelDef } from '@nishi/shared';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { audio } from '../audio/engine';
 import { fx, now } from '../game/fx';
 import { runtime } from '../game/runtime';
 import { app } from '../state/store';
+import { MOON_DIR } from './Atmosphere';
 
 /** current brightness factor (0..1+) of every level light, shared with other scene parts */
 export const lightLevels = new Map<string, number>();
 
-const LIGHT_SCALE = 3.2;
+const LIGHT_SCALE = 3.6;
+
+let haloTex: THREE.Texture | null = null;
+function halo() {
+  if (haloTex) return haloTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.12, 'rgba(255,255,255,0.55)');
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.12)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  haloTex = new THREE.CanvasTexture(c);
+  return haloTex;
+}
 
 function chronic(def: LightDef, t: number, reduced: boolean) {
   const f = def.faulty ?? 0;
@@ -76,12 +93,17 @@ function Fixture({ def }: { def: LightDef }) {
     [def.color],
   );
   const cone = useMemo(coneMaterial, []);
+  const haloMat = useMemo(
+    () => new THREE.SpriteMaterial({ map: halo(), color: def.color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
+    [def.color],
+  );
   const indoor = def.pos.y < 4.5;
   const coneH = def.kind === 'tube' ? (def.pos.y < 0 ? 2.8 : indoor ? 3.8 : 4.6) : def.kind === 'bulb' ? 3.2 : 0;
   useFrame(() => {
     const lv = lightLevels.get(def.id) ?? 0;
-    tubeMat.emissiveIntensity = lv * (def.kind === 'lamp' ? 6 : 3.2);
+    tubeMat.emissiveIntensity = lv * (def.kind === 'lamp' ? 6 : def.kind === 'lantern' ? 8 : 3.2);
     cone.uniforms.uOpacity.value = lv * (def.kind === 'tube' ? 0.07 : 0.05);
+    haloMat.opacity = Math.min(1, lv) * (def.kind === 'lamp' ? 0.5 : def.kind === 'sign' ? 0.25 : 0.42);
     (cone.uniforms.uColor.value as THREE.Color).set(def.color);
   });
   return (
@@ -112,6 +134,26 @@ function Fixture({ def }: { def: LightDef }) {
           </mesh>
         </>
       )}
+      {def.kind === 'lantern' && (
+        <>
+          <mesh position={[0, 0.3, -0.25]}>
+            <boxGeometry args={[0.04, 0.04, 0.5]} />
+            <meshStandardMaterial color="#1c1a17" metalness={0.6} roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.02, 0]}>
+            <cylinderGeometry args={[0.13, 0.09, 0.32, 6]} />
+            <meshStandardMaterial color="#2a2a26" metalness={0.5} roughness={0.4} transparent opacity={0.55} />
+          </mesh>
+          <mesh position={[0, 0.22, 0]}>
+            <coneGeometry args={[0.17, 0.14, 6]} />
+            <meshStandardMaterial color="#1a1916" metalness={0.6} roughness={0.5} />
+          </mesh>
+          <mesh material={tubeMat}>
+            <sphereGeometry args={[0.05, 10, 8]} />
+          </mesh>
+        </>
+      )}
+      <sprite material={haloMat} scale={def.kind === 'tube' ? [2.6, 1.3, 1] : def.kind === 'sign' ? [3, 1.6, 1] : [1.7, 1.7, 1]} />
       {def.kind === 'lamp' && (
         <mesh material={tubeMat}>
           <sphereGeometry args={[0.05, 10, 8]} />
@@ -132,12 +174,14 @@ export function LightRig({ level, pool }: { level: LevelDef; pool: number }) {
   const lastAssign = useRef(0);
   const hemi = useRef<THREE.HemisphereLight>(null);
   const moon = useRef<THREE.DirectionalLight>(null);
-  const strike = useRef({ next: 8 + Math.random() * 10, t: -10, power: 1 });
   const byId = useMemo(() => new Map(level.lights.map((l) => [l.id, l])), [level]);
 
   useFrame(() => {
     const t = now();
     const reduced = app().settings.reducedFlashing;
+    const under = runtime.eye.y < -1.5;
+    if (hemi.current) hemi.current.intensity = under ? 0.03 : 0.07;
+    if (moon.current) moon.current.intensity = under ? 0 : 0.28;
     for (const l of level.lights) lightLevels.set(l.id, computeLightLevel(l, t, reduced));
 
     if (t - lastAssign.current > 0.2) {
@@ -163,28 +207,12 @@ export function LightRig({ level, pool }: { level: LevelDef; pool: number }) {
       pl.intensity = def.intensity * LIGHT_SCALE * (lightLevels.get(def.id) ?? 0);
     });
 
-    // lightning over the monsoon sky
-    const s = strike.current;
-    if (t > s.next) {
-      s.t = t;
-      s.power = 0.5 + Math.random() * 0.5;
-      s.next = t + 14 + Math.random() * 22;
-      audio.thunder(0.6 + Math.random() * 2.2, s.power);
-    }
-    const k = t - s.t;
-    let flash = 0;
-    if (k < 0.6) {
-      flash = reduced ? Math.max(0, 1 - k / 0.6) * 0.35 : (k < 0.08 || (k > 0.18 && k < 0.26) ? 1 : k < 0.6 ? 0.15 : 0);
-    }
-    const underground = runtime.eye.y < -1.5;
-    if (hemi.current) hemi.current.intensity = 0.32 + (underground ? 0 : flash * 2.2 * s.power);
-    if (moon.current) moon.current.intensity = 0.22 + (underground ? 0 : flash * 5 * s.power);
   });
 
   return (
     <>
-      <hemisphereLight ref={hemi} args={['#2b3a52', '#0c0a08', 0.32]} />
-      <directionalLight ref={moon} color="#8fa3c8" intensity={0.22} position={[-20, 40, 60]} />
+      <hemisphereLight ref={hemi} args={['#1b3a40', '#030404', 0.07]} />
+      <directionalLight ref={moon} color="#7fb3bd" intensity={0.28} position={[MOON_DIR.x * 60, MOON_DIR.y * 60, MOON_DIR.z * 60]} />
       {Array.from({ length: pool }, (_, i) => (
         <pointLight key={i} ref={(el) => {
             refs.current[i] = el;

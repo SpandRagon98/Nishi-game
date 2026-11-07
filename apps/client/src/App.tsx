@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { audio } from './audio/engine';
+import { music } from './audio/music';
 import { installInput } from './game/input';
 import { graphicsProfile } from './state/settings';
 import { useApp } from './state/store';
@@ -54,7 +55,11 @@ export function App() {
     installInput();
     void useApp.getState().initProfile();
     void getTextures(graphicsProfile(useApp.getState().settings.graphics).textureSize, setBootProgress).then(() => setBooted(true));
-    const unlock = () => audio.unlock();
+    const unlock = () => {
+      audio.unlock();
+      audio.startAmbience();
+      music.kick();
+    };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
     return () => {
@@ -64,8 +69,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    audio.setVolumes({ master: settings.master, ambience: settings.ambience, dialogue: settings.dialogue, effects: settings.effects });
-  }, [settings.master, settings.ambience, settings.dialogue, settings.effects]);
+    audio.setVolumes({ master: settings.master, ambience: settings.ambience, dialogue: settings.dialogue, effects: settings.effects, music: settings.music });
+  }, [settings.master, settings.ambience, settings.dialogue, settings.effects, settings.music]);
 
   // Esc from sub-screens returns to the menu
   useEffect(() => {

@@ -222,6 +222,7 @@ export function SettingsPanel() {
         <Slider label="Ambience" value={s.ambience} onChange={(v) => set({ ambience: v })} />
         <Slider label="Dialogue" value={s.dialogue} onChange={(v) => set({ dialogue: v })} />
         <Slider label="Effects" value={s.effects} onChange={(v) => set({ effects: v })} />
+        <Slider label="Music" value={s.music} onChange={(v) => set({ music: v })} />
         <Toggle label="Spoken voice lines" hint="Uses your browser's speech voices" value={s.voiceLines} onChange={(v) => set({ voiceLines: v })} />
       </section>
       <section className="panel">

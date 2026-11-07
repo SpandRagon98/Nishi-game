@@ -298,19 +298,6 @@ export function Decor() {
     for (let i = 0; i < 10; i++) out.push({ p: [-48 + Math.random() * 100, -1.19, 12.2 + Math.random() * 1.2], s: [1 + Math.random() * 3, 0.5 + Math.random()] });
     return out;
   }, []);
-  const windows = useMemo(() => {
-    const out: { p: V3 }[] = [];
-    for (let x = -11; x <= 11; x += 1.6) {
-      if (Math.abs(x + 9.5) < 0.9 || Math.abs(x - 9.5) < 0.9) continue;
-      for (const z of [8.385, 8.515, 11.485, 11.615]) out.push({ p: [x, 1.42, z] });
-    }
-    return out;
-  }, []);
-  const windowBars = useMemo(() => {
-    const out: { p: V3 }[] = [];
-    for (const w of windows) for (let k = -2; k <= 2; k++) out.push({ p: [w.p[0] + k * 0.17, 1.42, w.p[2] + (w.p[2] < 10 ? (w.p[2] < 8.45 ? -0.01 : 0.01) : w.p[2] > 11.55 ? 0.01 : -0.01)] });
-    return out;
-  }, [windows]);
   const levers = useMemo(() => Array.from({ length: 16 }, (_, i) => ({ p: [11.5 + i * 0.47, 1.65, -13.05] as V3, r: [0.25 * (i % 3 === 0 ? -1 : 1), 0, 0] as V3, k: i % 3 })), []);
   const masts = useMemo(() => Array.from({ length: 5 }, (_, i) => ({ p: [-40 + i * 25, 2.4, 18.6] as V3 })), []);
 
@@ -376,19 +363,6 @@ export function Decor() {
         </mesh>
       </group>
       <Board tex={tex.clock} w={0.45} h={0.45} position={[5, 2.6, -13.72]} />
-
-      {/* carriage */}
-      <Instanced items={windows} size={[1.1, 0.7, 0.005]} material={m.glass} />
-      <Instanced items={windowBars} size={[0.025, 0.72, 0.02]} material={m.bar} />
-      <Board tex={tex.coach} w={1.6} h={0.4} position={[2, 0.65, 8.38]} rotation={[0, Math.PI, 0]} />
-      <mesh position={[0, 2.82, 10]} rotation={[0, 0, Math.PI / 2]} scale={[0.22, 1, 1]} material={m.rail}>
-        <cylinderGeometry args={[1.62, 1.62, 24, 18, 1, false, 0, Math.PI]} />
-      </mesh>
-      {[-8, 6].map((x) => (
-        <mesh key={x} position={[x, -0.75, 10]} material={m.dark}>
-          <boxGeometry args={[2.6, 0.6, 2.4]} />
-        </mesh>
-      ))}
 
       {/* wet patches */}
       {puddles.map((p, i) => (

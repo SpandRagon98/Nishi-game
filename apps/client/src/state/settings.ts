@@ -6,6 +6,7 @@ export interface Settings {
   ambience: number;
   dialogue: number;
   effects: number;
+  music: number;
   voiceLines: boolean;
   subtitles: boolean;
   brightness: number; // 0.6 – 1.6
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ambience: 0.8,
   dialogue: 0.9,
   effects: 0.85,
+  music: 0.7,
   voiceLines: true,
   subtitles: true,
   brightness: 1,
@@ -66,12 +68,14 @@ export interface GraphicsProfile {
   rain: number;
   lightPool: number;
   post: boolean;
+  /** screen-space ambient occlusion */
+  ao: boolean;
   textureSize: number;
 }
 
 export function graphicsProfile(p: GraphicsPreset): GraphicsProfile {
   const dev = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-  if (p === 'low') return { dpr: 0.85, shadows: false, rain: 1800, lightPool: 4, post: false, textureSize: 256 };
-  if (p === 'high') return { dpr: Math.min(2, dev), shadows: true, rain: 7000, lightPool: 8, post: true, textureSize: 1024 };
-  return { dpr: Math.min(1.25, dev), shadows: false, rain: 4000, lightPool: 6, post: true, textureSize: 512 };
+  if (p === 'low') return { dpr: 0.85, shadows: false, rain: 1800, lightPool: 4, post: false, ao: false, textureSize: 256 };
+  if (p === 'high') return { dpr: Math.min(2, dev), shadows: true, rain: 7000, lightPool: 8, post: true, ao: true, textureSize: 1024 };
+  return { dpr: Math.min(1.25, dev), shadows: false, rain: 4000, lightPool: 6, post: true, ao: true, textureSize: 512 };
 }

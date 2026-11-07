@@ -82,7 +82,8 @@ add(box(40, -1.2, -2.3, 40.3, 3, 0, 'brick', 'wall'));
 add(box(-50, -1.2, -2.3, -40, 2.5, -2, 'brick', 'wall'));
 add(box(40, -1.2, -2.3, 56, 2.5, -2, 'brick', 'wall'));
 add(box(-50.3, -1.2, -2.3, -50, 2.5, 19.8, 'brick', 'wall'));
-add(box(-50, -1.2, 19.5, 56, 2.4, 19.8, 'corrugated', 'wall'));
+// far boundary: rendered as a brick arcade with iron grilles (apps/client Station.tsx)
+add(box(-50, -1.2, 19.5, 56, 5, 19.8, 'brick', 'wall', { hidden: true }));
 // tunnel portal and inaccessible tunnel
 add(...wallZ(56, 57, -2.3, 19.8, -1.2, 6, 'stone', [{ a: 8.5, b: 14.5, top: 5.6 }]));
 add(box(57, -1.5, 8.5, 64, -1.2, 14.5, 'ballast', 'floor'));
@@ -94,7 +95,7 @@ add(box(60.5, -1.2, 8.5, 63, 3.0, 14.5, 'stone', 'wall', { id: 'tunnel_debris' }
 add(box(63.5, -1.2, 8.5, 64, 4.4, 14.5, 'darkness', 'wall'));
 
 // ───────────────────────── Platform furniture ─────────────────────────
-add(box(-38, 5, -T, 38, 5.15, 7.6, 'rust', 'ceiling', { id: 'canopy' }));
+add(box(-38, 5, -T, 38, 5.15, 7.6, 'corrugated', 'ceiling', { id: 'canopy' }));
 for (let x = -36; x <= 36; x += 8) add(box(x - 0.18, 0, 6.32, x + 0.18, 5, 6.68, 'rust', 'prop', { los: false }));
 for (const x of [-32, -16, 16, 32]) add(box(x - 1.2, 0, 5.6, x + 1.2, 0.5, 6.1, 'wood', 'prop', { los: false }));
 add(box(-1.5, 0, 5.4, 1.5, 2.4, 7.0, 'corrugated', 'prop', { id: 'tea_stall' }));
@@ -122,17 +123,22 @@ add(box(-3.6, -3.5, 6.7, -2.4, -3.0, 7.4, 'wood', 'prop', { id: 'passage_crate',
 
 // ───────────────────────── Carriage (track 1) ─────────────────────────
 add(box(-12, -0.15, 8.0, 12, 0.05, 11.6, 'carriage', 'floor', { id: 'carriage_floor' }));
-add(box(-11.5, -1.2, 8.4, 11.5, -0.15, 11.6, 'metal', 'wall', { los: false, id: 'undercarriage' }));
-add(...wallX(8.4, 8.5, -12, 12, 0.05, 2.7, 'carriage', [door(-10, -9, 2.05), door(9, 10, 2.05)]));
-add(box(-12, 0.05, 11.5, 12, 2.7, 11.6, 'carriage', 'wall'));
-add(box(-12, 0.05, 8.4, -11.9, 2.7, 11.6, 'carriage', 'wall'));
-add(box(11.9, 0.05, 8.4, 12, 2.7, 11.6, 'carriage', 'wall'));
-add(box(-12, 2.7, 8.4, 12, 2.9, 11.6, 'carriage', 'ceiling'));
+add(box(-11.5, -1.2, 8.4, 11.5, -0.15, 11.6, 'metal', 'wall', { los: false, id: 'undercarriage', hidden: true }));
+// coach shell: collision only — the detailed EMU body is drawn by the client (Train.tsx)
+add(...wallX(8.4, 8.5, -12, 12, 0.05, 2.7, 'carriage', [door(-10, -9, 2.05), door(9, 10, 2.05)], { hidden: true }));
+add(box(-12, 0.05, 11.5, 12, 2.7, 11.6, 'carriage', 'wall', { hidden: true }));
+add(box(-12, 0.05, 8.4, -11.9, 2.7, 11.6, 'carriage', 'wall', { hidden: true }));
+add(box(11.9, 0.05, 8.4, 12, 2.7, 11.6, 'carriage', 'wall', { hidden: true }));
+add(box(-12, 2.7, 8.4, 12, 2.9, 11.6, 'carriage', 'ceiling', { hidden: true }));
 for (const x of [-10.5, -7, -3.5, 0, 3.5, 7]) add(box(x - 0.03, 0.05, 9.8, x + 0.03, 2.0, 11.5, 'wood', 'wall'));
 for (const x of [-8.75, -5.25, -1.75, 1.75, 5.25, 8.6]) {
   add(box(x - 1.4, 0.05, 10.6, x + 1.4, 0.5, 11.5, 'wood', 'prop', { los: false }));
 }
 add(box(10.5, 0.05, 10.4, 11.9, 2.4, 11.5, 'metal', 'prop', { id: 'carriage_toilet' }));
+// the rest of the parked EMU rake, running into the tunnel (drawn by the client)
+add(box(12.25, -1.2, 8.45, 57, 3.1, 11.55, 'carriage', 'wall', { hidden: true, id: 'emu_rake' }));
+// EMU driving-cab nose at the west end (drawn by the client)
+add(box(-12.7, -0.15, 8.45, -12, 2.85, 11.55, 'carriage', 'wall', { hidden: true, id: 'emu_cab' }));
 
 // ───────────────────────── Room furniture ─────────────────────────
 // ticket office
@@ -177,11 +183,16 @@ export const PLATFORM_ZERO: LevelDef = {
   ],
   lights: [
     // emergency circuit (battery) — on from the start, faulty
-    { id: 'l_plat_flicker', pos: v3(-20, 4.7, 4), color: '#ffd98a', intensity: 9, distance: 16, circuit: 'emergency', zone: 'platform', kind: 'tube', faulty: 0.55 },
+    { id: 'l_plat_flicker', pos: v3(-20, 4.7, 4), color: '#cfeef0', intensity: 9, distance: 16, circuit: 'emergency', zone: 'platform', kind: 'tube', faulty: 0.55 },
     { id: 'l_sign', pos: v3(-10, 4.2, 0.9), color: '#ffcf7a', intensity: 4, distance: 9, circuit: 'emergency', zone: 'platform', kind: 'sign', faulty: 0.25 },
     { id: 'l_concourse_em', pos: v3(-10, 3.9, -7), color: '#ffe0a0', intensity: 6, distance: 12, circuit: 'emergency', zone: 'concourse', kind: 'tube', faulty: 0.35 },
     { id: 'l_passage_em', pos: v3(-15, -0.9, 3.5), color: '#cfe8ff', intensity: 4, distance: 10, circuit: 'emergency', zone: 'passage', kind: 'tube', faulty: 0.7 },
     { id: 'l_maint_em', pos: v3(25, 3.9, -8), color: '#ffc070', intensity: 5, distance: 11, circuit: 'emergency', zone: 'maintenance', kind: 'bulb', faulty: 0.2 },
+    // cast-iron wall lanterns on the station front (battery circuit, sodium-warm)
+    ...[-28, -17.5, 7.5, 19, 27].map((x, i) => ({
+      id: `l_lantern_${i}`, pos: v3(x, 2.9, 0.32), color: '#ffa04a', intensity: 2.4, distance: 7.5,
+      circuit: 'emergency' as const, zone: 'platform', kind: 'lantern' as const, faulty: [0.15, 0.5, 0.05, 0.3, 0.6][i],
+    })),
     { id: 'l_signal_red', pos: v3(15, 2.4, -13.2), color: '#ff3b2a', intensity: 2.5, distance: 7, circuit: 'emergency', zone: 'signal', kind: 'lamp', faulty: 0.1 },
     // main circuit — restored by the fuse puzzle
     { id: 'l_plat_w', pos: v3(-32, 4.7, 4), color: '#fff1c4', intensity: 10, distance: 18, circuit: 'main', zone: 'platform', kind: 'tube', faulty: 0.1 },
@@ -243,7 +254,7 @@ export const PLATFORM_ZERO: LevelDef = {
     { id: 'gw', pos: v3(-46, -1.2, 4) },
     { id: 'ge', pos: v3(46, -1.2, 4) },
     ...[-46, -30, -14, 0, 14, 30, 46].map((x) => ({ id: `t${x}`, pos: v3(x, -1.2, 14) })),
-    { id: 'tun', pos: v3(57.5, -1.2, 11.5) },
+    { id: 'tun', pos: v3(57.8, -1.2, 13.4) },
     // ticket office
     { id: 'tk_in', pos: v3(-25.3, 0, -1.5) },
     { id: 'tk_c', pos: v3(-25, 0, -4) },
@@ -291,7 +302,7 @@ export const PLATFORM_ZERO: LevelDef = {
     ['m-12', 'cd1'], ['m12', 'cd2'], ['cd1', 'c-9.5'], ['cd2', 'c9.5'],
     ['c-9.5', 'c-4'], ['c-4', 'c2'], ['c2', 'c9.5'],
     ['p-38', 'rw'], ['rw', 'gw'], ['p38', 're'], ['re', 'ge'],
-    ['gw', 't-46'], ['ge', 't46'], ['t-46', 't-30'], ['t-30', 't-14'], ['t-14', 't0'], ['t0', 't14'], ['t14', 't30'], ['t30', 't46'], ['t46', 'tun'],
+    ['gw', 't-46'], ['t-46', 't-30'], ['t-30', 't-14'], ['t-14', 't0'], ['t0', 't14'], ['t14', 't30'], ['t30', 't46'], ['t46', 'tun'],
     ['p-25.3', 'tk_in'], ['tk_in', 'tk_c'], ['tk_c', 'tk_side'], ['tk_back', 'tk_side'], ['tk_side', 'cc_w'],
     ['p-10', 'cc_arch'], ['cc_arch', 'cc_c'], ['cc_c', 'cc_w'], ['cc_c', 'cc_e'], ['cc_c', 'cc_gate'], ['cc_gate', 'ex1'], ['ex1', 'ex2'],
     ['cc_e', 'of_w'], ['p4.6', 'of_in'], ['of_in', 'of_c'], ['of_c', 'of_sw'], ['of_sw', 'of_w'], ['of_sw', 'of_desk'], ['of_c', 'of_desk'], ['of_c', 'of_back'], ['of_back', 'of_e'], ['of_e', 'sg_w'],
@@ -301,7 +312,7 @@ export const PLATFORM_ZERO: LevelDef = {
     ['u-29', 'u-20'], ['u-20', 'u-10'], ['u-10', 'u-1'], ['u-1', 'u10'], ['u10', 'u20'], ['u20', 'u29'], ['u-1', 'u_alc'],
   ],
   survivorSpawns: [v3(-22, 0, 3.4), v3(-20.5, 0, 3.4), v3(-22, 0, 4.6), v3(-20.5, 0, 4.6)],
-  ghostSpawn: v3(57.5, -1.2, 11.5),
+  ghostSpawn: v3(57.8, -1.2, 13.4),
   escapeZone: { minX: -12, minZ: -22, maxX: -8, maxZ: -19 },
   checkpoints: {
     start: v3(-21, 0, 4),

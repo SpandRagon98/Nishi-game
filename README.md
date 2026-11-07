@@ -2,7 +2,7 @@
 
 > *The living call your name three times. The dead only call twice. But something has learned to call a third time.*
 
-A first-person Indian supernatural survival-horror game for desktop browsers. Chapter 1, **Platform Zero**, is a complete playable mission at a fictional abandoned railway junction near Kolkata during a monsoon night. You can play it solo against an AI ghost, co-op with up to four survivors, or 4-vs-1 with a player controlling the ghost, **The Caller**.
+A first-person Indian supernatural survival-horror game for desktop browsers. Chapter 1, **Platform Zero**, is a complete playable mission at a fictional abandoned railway junction near Kolkata on a misty night. You can play it solo against an AI ghost, co-op with up to four survivors, or 4-vs-1 with a player controlling the ghost, **The Caller**.
 
 All characters, places (Nishipur Junction) and Project SHUNYA are original fiction.
 
@@ -81,12 +81,20 @@ Browsers reserve **Ctrl+W** outside fullscreen. Use **C** to crouch, or use **Pa
 
 ### Art and audio approach (be aware)
 Everything is **procedural**, and no external assets are bundled:
-- Materials are canvas-painted PBR sets (albedo, roughness and normal) with world-space UVs. Examples: wet platform tiles, two-tone railway plaster, terrazzo, rust, brick, ballast, corrugated sheet, coach paint and glazed tiles.
-- Lighting is a pooled set of real lights plus emissive fixtures and fake volumetric cones. There is GPU rain, ground fog, lightning, and post-processing (bloom, grain, vignette, and chromatic smear near the Caller).
-- Characters are primitive-built humanoids. The Caller uses a custom glitching, spectral shader.
-- All sound is synthesised with Web Audio: rain, 50 Hz mains hum, footsteps by surface, the Indian phone-ring cadence, a PA chime, whispers, a drone and heartbeat, thunder and more. Spoken lines use the browser's built-in speech voices. Subtitles always carry every line.
+- **Materials:** canvas-painted PBR sets (albedo, roughness and normal) with world-space UVs, such as wet platform tiles, two-tone railway plaster, terrazzo, rust, brick, ballast, corrugated sheet, coach paint and glazed tiles.
+- **Atmosphere:** no rain. Height-weighted mist is densest near the ground and in the passage, with drifting fog banks, a moon, moonlight shafts through a broken roof, and dust visible only inside torch beams. A night-sky environment map gives the wet floor its reflections.
+- **Station:** a Howrah-style arched cast-iron train shed, a brick arcade with iron grilles, sodium wall lanterns, cast-iron benches, a coin weighing machine, a shrine with dried marigolds and a diya, dead indicator boards, Bengali graffiti, abandoned belongings and weeds in the ballast.
+- **Train:** a three-coach Kolkata suburban EMU rake with livery, barred windows, open doorways, bogies, roof ventilators, a raised pantograph and a cab with a working headlight. The last coach disappears into the tunnel.
+- **Rendering:** pooled real lights plus emissive fixtures and fake volumetric cones. Post-processing adds SSAO (screen-space ambient occlusion, Medium and High presets), bloom, a contrast grade, grain, vignette, and chromatic smear near the Caller.
+- **Characters:** primitive-built humanoids. The Caller and the figures watching from the mist use a custom glitching spectral shader. You hold a phone torch, and later a metal flashlight, in first person.
+- **Prologue:** a 3D desk scene with a 1990s two-in-one radio-cassette player and a handwritten cassette, shot with depth of field.
+- **Audio:** all synthesised with Web Audio, through a station-sized convolution reverb and a master limiter.
+  - Night ambience: wind through the shed, distant Kolkata traffic and horns, crickets, drips, a far-off train horn and dogs howling.
+  - Voices: formant-synthesised screams (woman, man, through a telephone), the Caller's ring-modulated shriek, and moans.
+  - Score: a detuned tanpura (Karplus-Strong), dissonant strings, trembling high strings, and dhol/tasha chase percussion with a Shepard tone during hunts.
+  - Spoken lines use the browser's speech voices, and subtitles carry every line.
 
-This looks good for a prototype, but it is **not AAA-asset fidelity**. The rendering is built so modelled assets can replace the blockout. See *Next steps*.
+The atmosphere and lighting are a big step up, but this is still **not AAA-asset fidelity**. Modelled glTF assets and recorded voice acting are the next quality jump (see *Next steps*).
 
 ### Not done yet (honest list)
 - Chapters 2–8, and survivors Meera, Tenzin and Farah. They are registered as data and shown as locked or upcoming.
@@ -154,13 +162,14 @@ The server needs a long-running Node.js process with WebSockets. It will not run
 ---
 
 ## Performance notes
-- Graphics presets change the pixel ratio, the number of pooled dynamic lights (4/6/8), the rain density, post-processing, flashlight shadows (High only), and texture resolution (256/512/1024).
+- Graphics presets change the pixel ratio, the number of pooled dynamic lights (4/6/8), the dust-mote count, post-processing and SSAO, flashlight and headlight shadows (High only), and texture resolution (256/512/1024).
 - Measured on Intel Iris Xe at 1024×768 (Medium): about **6 ms** for a full scene render and about **4.5 ms** of JS per frame.
 - Rapier ships as a large WASM bundle (~1.1 MB gzipped). The first load shows a "Threading the tape…" cover while it initialises.
 
 ## Next steps
 1. Replace blockout props and characters with modelled, appropriately licensed glTF assets. Use KTX2 textures and add baked lightmaps.
-2. Add a rebinding UI and gamepad support.
-3. Filter state per client (`StateView`) so the ghost cannot read hidden survivors, and add server-side rate limits per action.
-4. Add Supabase-backed profiles through `ProfileRepository`.
-5. Build Chapter 2, *The House of Seven Locks*, on the same data-driven systems.
+2. Record or license real voice acting and screams. The synthesised voices are convincing, but not human.
+3. Add a rebinding UI and gamepad support.
+4. Filter state per client (`StateView`) so the ghost cannot read hidden survivors, and add server-side rate limits per action.
+5. Add Supabase-backed profiles through `ProfileRepository`.
+6. Build Chapter 2, *The House of Seven Locks*, on the same data-driven systems.

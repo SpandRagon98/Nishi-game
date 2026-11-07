@@ -217,9 +217,10 @@ input[type='range'] { accent-color: var(--crimson-hi); width: 100%; }
 .loading-art::after {
   content: ''; position: absolute; inset: 0;
   background: repeating-linear-gradient(100deg, transparent 0 22px, rgba(170, 190, 220, 0.05) 22px 23px);
-  animation: rain 0.5s linear infinite;
+  background: radial-gradient(ellipse at 30% 70%, rgba(110,150,160,0.10), transparent 55%), radial-gradient(ellipse at 75% 60%, rgba(110,150,160,0.08), transparent 50%);
+  animation: mist 18s ease-in-out infinite alternate;
 }
-@keyframes rain { to { background-position: -40px 160px; } }
+@keyframes mist { to { transform: translateX(-6%) scale(1.08); opacity: 0.7; } }
 .loading-inner { position: relative; z-index: 4; padding: 8vh 7vw; max-width: 900px; }
 .loading.boot { align-items: center; justify-content: center; }
 .loading.boot .loading-inner { text-align: center; }
@@ -400,3 +401,9 @@ input[type='range'] { accent-color: var(--crimson-hi); width: 100%; }
 
 .scene-cover { position: absolute; inset: 0; z-index: 15; background: var(--ink); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 12px; letter-spacing: 0.25em; color: var(--grey); }
 .scene-cover span { animation: blink 1.4s steps(2) infinite; }
+
+.cassette-canvas { position: absolute !important; inset: 0; z-index: 0; }
+.lab { position: absolute; inset: 0; justify-content: flex-end; padding-bottom: 7vh; }
+.lab-caption { position: absolute; top: 28px; left: 32px; z-index: 4; }
+.lab-actions, .lab .subtitle { position: relative; z-index: 4; }
+.lab-actions p { text-shadow: 0 2px 12px #000; }

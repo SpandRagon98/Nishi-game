@@ -1246,6 +1246,11 @@ export class MatchSimulation {
       case 'radio_whisper':
         this.emit({ type: 'whisper', text: this.rng.pick(WHISPERS), to: [t.id] });
         break;
+      case 'distant_scream': {
+        const far = this.nav.ids.map((id) => this.nav.pos.get(id)!).filter((p) => dist(p, t.pos) > 25 && dist(p, t.pos) < 45);
+        if (far.length) this.emit({ type: 'sfx', sound: 'scream_distant', pos: copyV(this.rng.pick(far)) });
+        break;
+      }
       case 'train_creak':
         this.emit({ type: 'sfx', sound: 'train_creak', pos: v3(this.rng.range(-10, 10), 1, 10) });
         break;

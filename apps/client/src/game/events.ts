@@ -1,6 +1,7 @@
 import { OBJECTIVES, applyMatchResult, type MatchResult, type SimEvent } from '@nishi/shared';
 import { audio } from '../audio/engine';
 import { speak } from '../audio/speech';
+import { music } from '../audio/music';
 import { app, useApp } from '../state/store';
 import { addApparition, fx, now } from './fx';
 import type { GameSession } from './session';
@@ -39,6 +40,7 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
       break;
     case 'phone':
       s.subtitle({ speaker: 'TELEPHONE', text: e.text, kind: 'phone' });
+      setTimeout(() => audio.scream('woman', undefined, 0.3, true), 4200);
       speak(e.text.replace(/^[^"]*"|".*$/g, ''), { enabled: voiceOn, voice: 'female', rate: 0.85, pitch: 0.8 });
       break;
     case 'pickup':
@@ -66,6 +68,7 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
     case 'apparition':
       addApparition(e.pos, e.yaw, e.duration, 'apparition');
       audio.whisper(e.pos);
+      audio.stinger(e.pos);
       fx.shake = Math.max(fx.shake, 0.35);
       break;
     case 'shadow':
@@ -76,6 +79,8 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
       else if (e.phase === 'start') {
         fx.huntPhase = 'hunt';
         audio.silence(1.1);
+        setTimeout(() => audio.shriek(session.snapshot()?.ghost.pos), 900);
+        music.setMood('hunt');
         fx.shake = Math.max(fx.shake, 0.4);
       } else fx.huntPhase = 'none';
       break;
@@ -93,7 +98,11 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
         stunned_ghost: self ? 'Your beam burned it. RUN.' : `${e.name} stunned the Caller!`,
       }[e.what];
       s.toast({ title: text, tone: e.what === 'downed' || e.what === 'captured' ? 'warn' : 'good' }, 3500);
-      if (e.what === 'downed' || e.what === 'captured') fx.shake = Math.max(fx.shake, self ? 0.8 : 0.2);
+      if (e.what === 'downed' || e.what === 'captured') {
+        fx.shake = Math.max(fx.shake, self ? 0.8 : 0.2);
+        const victim = session.snapshot()?.survivors.find((x) => x.id === e.playerId);
+        audio.scream(victim?.characterId === 'kabir' ? 'man' : 'woman', self ? undefined : victim?.pos, self ? 0.55 : 0.4);
+      }
       break;
     }
     case 'objective': {

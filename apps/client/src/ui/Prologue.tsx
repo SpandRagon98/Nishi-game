@@ -2,6 +2,8 @@ import { grantAchievement } from '@nishi/shared';
 import { useEffect, useRef, useState } from 'react';
 import { audio } from '../audio/engine';
 import { speak, stopSpeech } from '../audio/speech';
+import { music } from '../audio/music';
+import { CassetteScene } from './CassetteScene';
 import { useApp } from '../state/store';
 import { Btn, TapeLines } from './common';
 
@@ -22,7 +24,7 @@ function useTyped(text: string, speed = 28) {
     const id = setInterval(() => setN((v) => (v >= text.length ? v : v + 1)), speed);
     return () => clearInterval(id);
   }, [text, speed]);
-  return text.slice(0, n);
+  return [text.slice(0, n), () => setN(text.length)] as const;
 }
 
 export function Prologue() {
@@ -33,12 +35,16 @@ export function Prologue() {
   const [line, setLine] = useState(0);
   const [sub, setSub] = useState('');
   const timers = useRef<number[]>([]);
-  const typed = useTyped(step === 'intro' ? INTRO[line] : '', 30);
+  const [typed, finishTyping] = useTyped(step === 'intro' ? INTRO[line] : '', 30);
 
   const later = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
-  useEffect(() => () => {
-    timers.current.forEach(clearTimeout);
-    stopSpeech();
+  useEffect(() => {
+    music.setMood('silent');
+    return () => {
+      timers.current.forEach(clearTimeout);
+      stopSpeech();
+      audio.tapeStop();
+    };
   }, []);
 
   const finish = (choice: string) => {
@@ -59,7 +65,7 @@ export function Prologue() {
   const playTape = () => {
     audio.unlock();
     setStep('playing');
-    audio.sfx('tape');
+    audio.tapeStart();
     const lines = [
       [600, "Aditi... if you're hearing this, I'm still at the station."],
       [5200, "Platform Zero. It isn't on any map. They built it for the recordings."],
@@ -72,15 +78,22 @@ export function Prologue() {
         speak(text, { enabled: settings.voiceLines, voice: 'female', rate: 0.88, pitch: 1.05 });
       });
     }
-    later(15800, () => {
+    // the recording ends in her scream, then the tape runs out
+    later(14600, () => {
       setSub('');
+      audio.scream('woman', undefined, 0.42, true);
+    });
+    later(17200, () => {
+      audio.tapeStop();
       setStep('choice');
     });
   };
 
   const rewind = () => {
     setStep('rewind');
+    audio.tapeStart(true);
     audio.whisper();
+    later(5600, () => audio.tapeStop());
     later(500, () => setSub('(slowed to quarter speed, beneath the hiss) "...she was never alone in the booth. I am still in the booth..."'));
     later(1500, () => speak('I am still in the booth.', { enabled: settings.voiceLines, voice: 'male', rate: 0.5, pitch: 0.2 }));
     later(7000, () => finish('rewind'));
@@ -112,7 +125,7 @@ export function Prologue() {
 
   const next = () => {
     audio.unlock();
-    if (typed.length < INTRO[line].length) return;
+    if (typed.length < INTRO[line].length) return finishTyping();
     if (line < INTRO.length - 1) setLine(line + 1);
     else setStep('lab');
   };
@@ -129,17 +142,12 @@ export function Prologue() {
       )}
       {(step === 'lab' || step === 'playing' || step === 'choice' || step === 'rewind' || step === 'call') && (
         <div className="lab">
+          <CassetteScene state={step} />
           <div className="lab-caption">Aditi Sen's forensic audio lab · Salt Lake, Kolkata · 01:52 AM</div>
-          <div className={`deck${step === 'playing' || step === 'rewind' ? ' spinning' : ''}${step === 'rewind' ? ' reverse' : ''}`}>
-            <div className="reel" />
-            <div className="reel" />
-            <div className="deck-label">REEL 7731 · SHUNYA FIELD UNIT 4 · 13.03.1999</div>
-            <div className="vu"><span /><span /><span /><span /><span /><span /><span /><span /></div>
-          </div>
           {step === 'lab' && (
             <div className="lab-actions">
-              <p>An unmarked parcel. One reel of quarter-inch tape. Your mother's handwriting on the box.</p>
-              <Btn primary onClick={playTape}>▶ Play the reel (E)</Btn>
+              <p>An unmarked parcel. One cassette. Your mother's handwriting on the label.</p>
+              <Btn primary onClick={playTape}>▶ Play the cassette (E)</Btn>
             </div>
           )}
           {step === 'choice' && (

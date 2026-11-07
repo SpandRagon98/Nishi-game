@@ -176,7 +176,7 @@ export function spectralMaterial(glow = '#9fb8c8', base = '#06080a') {
   });
 }
 
-function shadowMaterial() {
+export function shadowMaterial() {
   const m = spectralMaterial('#1a1d22', '#000000');
   m.uniforms.uOpacity.value = 0.95;
   return m;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { audio } from '../audio/engine';
+import { music } from '../audio/music';
 import { hasReconnectToken } from '../game/net';
 import { useApp } from '../state/store';
 import { MenuCanvas } from '../three/GameScene';
@@ -13,6 +14,7 @@ export function MainMenu() {
 
   useEffect(() => {
     audio.startAmbience();
+    music.setMood('menu');
     audio.updateAmbience({ indoor: false, underground: false, hum: 0.1, ghostDist: 99, hunting: false, signalRange: 1, menu: true });
   }, []);
 

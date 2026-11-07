@@ -113,7 +113,7 @@ export interface WorldSnapshot {
 export type SfxId =
   | 'door_open' | 'door_close' | 'door_slam' | 'locked' | 'unlock' | 'spark' | 'power_up'
   | 'gate_motor' | 'phone_ring' | 'footsteps' | 'creak' | 'train_creak' | 'keypad_ok' | 'keypad_fail'
-  | 'capture' | 'revive' | 'stun' | 'pickup' | 'tape' | 'hide' | 'unhide' | 'paper';
+  | 'capture' | 'revive' | 'stun' | 'pickup' | 'tape' | 'hide' | 'unhide' | 'paper' | 'scream_distant' | 'train_horn';
 
 type To = { to?: string[] };
 

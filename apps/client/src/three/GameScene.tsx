@@ -3,7 +3,6 @@ import { Physics } from '@react-three/rapier';
 import { PLATFORM_ZERO, type LevelDef } from '@nishi/shared';
 import { Suspense, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { lockPointer } from '../game/input';
 import { fx } from '../game/fx';
 import { runtime } from '../game/runtime';
@@ -19,7 +18,12 @@ import { LevelColliders, LevelMeshes, makeMaterials } from './Level';
 import { LightRig } from './Lights';
 import { SurvivorController } from './SurvivorController';
 import { cachedTextures } from './textures';
-import { GroundFog, Horizon, Rain } from './Weather';
+import { Horizon } from './Weather';
+import { DustMotes, MistBanks, Moon, useNightSky } from './Atmosphere';
+import { StationArchitecture } from './Station';
+import { Train } from './Train';
+import { Props } from './Props';
+import { Watchers } from './Watchers';
 
 function SceneSetup() {
   const scene = useThree((s) => s.scene);
@@ -28,21 +32,10 @@ function SceneSetup() {
   useEffect(() => {
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__three = { scene, gl, camera };
   }, [scene, gl, camera]);
-  useEffect(() => {
-    scene.background = new THREE.Color('#05070a');
-    scene.fog = new THREE.FogExp2('#0a0d12', 0.034);
-    const pmrem = new THREE.PMREMGenerator(gl);
-    const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environment = env;
-    scene.environmentIntensity = 0.09;
-    return () => {
-      env.dispose();
-      pmrem.dispose();
-    };
-  }, [scene, gl]);
+  useNightSky();
   useFrame(() => {
     const s = app().settings;
-    gl.toneMappingExposure = 0.85 * s.brightness;
+    gl.toneMappingExposure = 0.6 * s.brightness;
     if (camera.fov !== s.fov) {
       camera.fov = s.fov;
       camera.updateProjectionMatrix();
@@ -64,8 +57,12 @@ function StationWorld({ level, withPhysics }: { level: LevelDef; withPhysics: bo
       {withPhysics && <LevelColliders level={level} />}
       <Decor />
       <LightRig level={level} pool={gp.lightPool} />
-      <Rain count={gp.rain} level={level} />
-      <GroundFog />
+      <StationArchitecture shadows={gp.shadows} />
+      <Train shadows={gp.shadows} />
+      <Props />
+      <MistBanks />
+      <DustMotes count={gp.rain > 3000 ? 1400 : 700} />
+      <Moon />
       <Horizon />
       {withPhysics && <Interactables level={level} materials={materials} />}
     </>
@@ -112,7 +109,7 @@ export function GameCanvas({ session }: { session: GameSession }) {
       dpr={gp.dpr}
       shadows={gp.shadows ? 'soft' : false}
       gl={{ antialias: !gp.post, powerPreference: 'high-performance', toneMapping: THREE.ACESFilmicToneMapping }}
-      camera={{ fov: 72, near: 0.05, far: 260, position: [-21, 1.6, 4] }}
+      camera={{ fov: 72, near: 0.05, far: 420, position: [-21, 1.6, 4] }}
       onPointerDown={(e) => {
         if (!app().overlay && !document.pointerLockElement) lockPointer(e.target as HTMLCanvasElement);
       }}
@@ -123,10 +120,11 @@ export function GameCanvas({ session }: { session: GameSession }) {
           {ghost ? <GhostController session={session} level={level} /> : <SurvivorController session={session} level={level} shadows={gp.shadows} />}
         </Physics>
         {!ghost && <GhostActor />}
+        {!ghost && <Watchers />}
         <Apparitions />
         <RemoteSurvivors localId={session.localId} ghostVision={ghost} />
         <GameLoop session={session} />
-        {gp.post && <Effects ghostVision={ghost} />}
+        {gp.post && <Effects ghostVision={ghost} ao={gp.ao} />}
       </Suspense>
     </Canvas>
   );
@@ -161,7 +159,7 @@ export function MenuCanvas() {
       className="menu-canvas"
       dpr={Math.min(gp.dpr, 1.25)}
       gl={{ antialias: true, powerPreference: 'high-performance', toneMapping: THREE.ACESFilmicToneMapping }}
-      camera={{ fov: 55, near: 0.05, far: 260 }}
+      camera={{ fov: 55, near: 0.05, far: 420 }}
     >
       <Suspense fallback={null}>
         <StationWorld level={PLATFORM_ZERO} withPhysics={false} />

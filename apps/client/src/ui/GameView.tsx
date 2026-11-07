@@ -181,7 +181,7 @@ function SurvivorHud() {
           </div>
         )}
         <div className="hud-status">
-          <span className={h.hasFlashlight ? (h.flashlight ? 'on' : '') : 'off'}><kbd>F</kbd> Flashlight</span>
+          <span className={h.flashlight ? 'on' : ''}><kbd>F</kbd> {h.hasFlashlight ? 'Flashlight' : 'Phone torch'}</span>
           <span className={h.abilityActive ? 'on' : h.abilityLeft > 0 ? 'off' : ''}>
             <kbd>Q</kbd> {h.abilityName}{h.abilityLeft > 0 ? ` ${Math.ceil(h.abilityLeft)}s` : ''}
           </span>

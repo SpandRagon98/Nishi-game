@@ -13,7 +13,7 @@ createRoot(document.getElementById('root')!).render(
 
 if (import.meta.env.DEV) {
   // dev-only inspection hook for automated play-testing
-  void Promise.all([import('./game/runtime'), import('./state/store')]).then(([r, s]) => {
-    (window as unknown as Record<string, unknown>).__nishi = { runtime: r.runtime, app: s.useApp };
+  void Promise.all([import('./game/runtime'), import('./state/store'), import('./audio/engine'), import('./audio/music')]).then(([r, s, a, m]) => {
+    (window as unknown as Record<string, unknown>).__nishi = { runtime: r.runtime, app: s.useApp, audio: a.audio, music: m.music };
   });
 }

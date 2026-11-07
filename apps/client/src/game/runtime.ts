@@ -9,4 +9,6 @@ export const runtime = {
   eye: { x: 0, y: 1.6, z: 0 },
   power: false,
   menu: false,
+  /** dev-only: force the local view direction once (automated screenshots) */
+  debugLook: null as { yaw: number; pitch: number } | null,
 };

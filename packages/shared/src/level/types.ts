@@ -57,7 +57,7 @@ export interface LightDef {
   distance: number;
   circuit: 'emergency' | 'main';
   zone: string;
-  kind: 'tube' | 'bulb' | 'sign' | 'lamp';
+  kind: 'tube' | 'bulb' | 'sign' | 'lamp' | 'lantern';
   /** base flicker amount 0..1 */
   faulty?: number;
 }
