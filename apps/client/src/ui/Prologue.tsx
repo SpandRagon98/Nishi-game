@@ -1,4 +1,4 @@
-import { grantAchievement } from '@nishi/shared';
+import { PROLOGUE_CALL as CALL, PROLOGUE_TAPE as TAPE, grantAchievement } from '@nishi/shared';
 import { useEffect, useRef, useState } from 'react';
 import { audio } from '../audio/engine';
 import { speak, stopSpeech } from '../audio/speech';
@@ -40,9 +40,22 @@ export function Prologue() {
   const [typed, finishTyping] = useTyped(step === 'intro' ? INTRO[line] : '', 30);
 
   const later = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
+  const gone = useRef(false);
+  const pause = (ms: number) => new Promise<void>((r) => later(ms, r));
+  /** plays the lines one after another, each subtitle staying up while its voice speaks */
+  const dialogue = async (lines: readonly (readonly [string, string, 'female' | 'male'])[]) => {
+    for (const [who, text, voice] of lines) {
+      if (gone.current) return false;
+      setSub(who ? `${who}: ${text}` : text);
+      await speak(text, { enabled: settings.voiceLines, voice, rate: who ? 1 : 0.88, pitch: who === 'KABIR' ? 0.95 : 1.05 });
+      await pause(450);
+    }
+    return !gone.current;
+  };
   useEffect(() => {
     music.setMood('silent');
     return () => {
+      gone.current = true;
       timers.current.forEach(clearTimeout);
       stopSpeech();
       audio.tapeStop();
@@ -72,6 +85,7 @@ export function Prologue() {
   };
 
   const skip = () => {
+    gone.current = true;
     stopSpeech();
     finish(useApp.getState().profile.story.choices.prologue ?? 'skipped');
   };
@@ -80,27 +94,19 @@ export function Prologue() {
     audio.unlock();
     setStep('playing');
     audio.tapeStart();
-    const lines = [
-      [600, "Aditi... if you're hearing this, I'm still at the station."],
-      [5200, "Platform Zero. It isn't on any map. They built it for the recordings."],
-      [10400, "It copies voices. It copied mine. Don't answer it when it calls the third time."],
-    ] as const;
-    for (const [at, text] of lines) {
-      later(at, () => {
-        setSub(text);
-        audio.sfx('tape');
-        speak(text, { enabled: settings.voiceLines, voice: 'female', rate: 0.88, pitch: 1.05 });
-      });
-    }
-    // the recording ends in her scream, then the tape runs out
-    later(14600, () => {
+    void (async () => {
+      await pause(600);
+      audio.sfx('tape');
+      const ok = await dialogue(TAPE);
+      if (!ok) return;
+      // the recording ends in her scream, then the tape runs out
       setSub('');
       audio.scream('woman', undefined, 0.42, true);
-    });
-    later(17200, () => {
-      audio.tapeStop();
-      setStep('choice');
-    });
+      later(2600, () => {
+        audio.tapeStop();
+        setStep('choice');
+      });
+    })();
   };
 
   const rewind = () => {
@@ -109,20 +115,17 @@ export function Prologue() {
     audio.whisper();
     later(5600, () => audio.tapeStop());
     later(500, () => setSub('(slowed to quarter speed, beneath the hiss) "...she was never alone in the booth. I am still in the booth..."'));
-    later(1500, () => speak('I am still in the booth.', { enabled: settings.voiceLines, voice: 'male', rate: 0.5, pitch: 0.2 }));
+    later(1500, () => void speak('I am still in the booth.', { enabled: settings.voiceLines, voice: 'male', rate: 0.5, pitch: 0.2 }));
     later(7000, () => finish('rewind'));
   };
 
   const callKabir = () => {
     setStep('call');
     audio.radioBurst();
-    const lines = [
-      [300, 'KABIR: Aditi? It\'s two in the morning.'],
-      [3600, 'ADITI: It\'s her, Kabir. Nishipur Junction. I\'m going tonight.'],
-      [7600, 'KABIR: Then I\'m driving. And Dev from the archive comes on the radio. No arguments.'],
-    ] as const;
-    for (const [at, text] of lines) later(at, () => setSub(text));
-    later(11500, () => finish('call'));
+    void (async () => {
+      await pause(700);
+      if (await dialogue(CALL)) later(800, () => finish('call'));
+    })();
   };
 
   useEffect(() => {

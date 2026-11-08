@@ -2,13 +2,14 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import {
   ACHIEVEMENTS, CHAPTERS, GHOSTS, GHOST_ABILITIES, SURVIVORS, describeUnlock, isUnlocked, type GhostDef, type SurvivorDef,
 } from '@nishi/shared';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import * as THREE from 'three';
 import { profileRepository } from '../state/profile';
 import { DEFAULT_SETTINGS } from '../state/settings';
 import { detectDevice } from '../perf/device';
 import { useApp } from '../state/store';
-import { Humanoid, spectralMaterial, type AnimState } from '../three/Characters';
+import { Humanoid, type AnimState } from '../three/Characters';
+import { CallerFigure } from '../three/Ghost';
 import { Btn, ScreenFrame, Segmented, Slider, Toggle } from './common';
 
 // ───────────────────────────── character select ─────────────────────────────
@@ -16,15 +17,14 @@ import { Btn, ScreenFrame, Segmented, Slider, Toggle } from './common';
 function Turntable({ survivor, ghost }: { survivor?: SurvivorDef; ghost?: GhostDef }) {
   const g = useRef<THREE.Group>(null);
   const anim = useRef<AnimState>({ speed: 0, crouch: false, down: false, phase: 0 });
-  const mat = useMemo(() => (ghost ? spectralMaterial(ghost.palette.glow) : undefined), [ghost]);
-  useFrame(({ clock }, dt) => {
+  const caller = useRef({ opacity: 1, speed: 0, stunned: false });
+  useFrame((_, dt) => {
     if (g.current) g.current.rotation.y += dt * 0.4;
-    if (mat) mat.uniforms.uTime.value = clock.elapsedTime;
   });
   const palette = survivor?.palette ?? { coat: '#000', accent: '#000', trousers: '#000', skin: '#000', hair: '#000' };
   return (
     <group ref={g} position={[0, -0.95, 0]}>
-      <Humanoid palette={palette} anim={anim} characterId={survivor?.id} spectral={mat} height={ghost ? 0.95 : 1.05} />
+      {ghost ? <CallerFigure control={caller} /> : <Humanoid palette={palette} anim={anim} characterId={survivor?.id} height={1.05} />}
     </group>
   );
 }

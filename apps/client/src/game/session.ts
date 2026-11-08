@@ -1,4 +1,5 @@
 import type { Room } from '@colyseus/sdk';
+import { inCutscene } from './cutscene';
 import {
   MatchSimulation, type GhostAbilityId, type GhostView, type MoveInput, type SimEvent, type SurvivorView, type Vec3,
   type WorldSnapshot, type WorldView,
@@ -75,7 +76,8 @@ export class LocalSession implements GameSession {
     return this.snap;
   }
   update(dt: number) {
-    this.sim.tick(dt);
+    // solo play holds still while a cutscene runs
+    if (!inCutscene()) this.sim.tick(dt);
     this.flush();
   }
   sendMove(m: MoveInput) {

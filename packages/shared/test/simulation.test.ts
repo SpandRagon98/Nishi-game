@@ -70,6 +70,31 @@ describe('MatchSimulation — solo playthrough', () => {
     expect(snap.world.objectives.escape).toBe(true);
   });
 
+  it('the console replays the reel-order announcement for anyone who missed it', () => {
+    const sim = new MatchSimulation({ seed: 99, mode: 'solo', passiveGhost: true });
+    sim.addSurvivor('p', 'Aditi', 'aditi');
+    sim.tick(0.05);
+    const use = (id: string) => {
+      sim.debugPlace('p', at(posOf(sim, id)));
+      return sim.interact('p', id);
+    };
+    use('flashlight_kit');
+    use('logbook');
+    use('drawer');
+    sim.debugPlace('p', { x: 24.6, y: 0, z: 0.8 });
+    sim.interact('p', 'd_maint');
+    use('fuse_box');
+    sim.snapshot().world.fuse.clue!.forEach((v, i) => sim.fuseSet('p', i, v));
+    sim.fuseSubmit('p');
+    run(sim, 5);
+    const order = sim.snapshot().world.decodeOrder!;
+    sim.drainEvents();
+    // power came on before the reels were found: the console still refuses, but repeats the order
+    expect(use('pa_console').ok).toBe(false);
+    const replay = sim.drainEvents().find((e) => e.type === 'announcement');
+    expect(replay && 'text' in replay && replay.text).toContain(`reel ${order[0]}, then reel ${order[1]}, then reel ${order[2]}`);
+  });
+
   it('never leaks puzzle solutions before they are discovered', () => {
     const sim = new MatchSimulation({ seed: 9, mode: 'solo', passiveGhost: true });
     sim.addSurvivor('p', 'A', 'aditi');

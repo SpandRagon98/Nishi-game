@@ -1,7 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { CapsuleCollider, RigidBody, useRapier, type RapierCollider, type RapierRigidBody } from '@react-three/rapier';
 import {
-  ADRENALINE_BOOST,
+  ADITI_THOUGHTS, ADRENALINE_BOOST,
   FLAG_CROUCH, FLAG_FLASHLIGHT, FLAG_MOVING, FLAG_SPRINT, OBJECTIVES, forwardFromYawPitch, survivorById, zoneAt,
   type LevelDef, type Vec3,
 } from '@nishi/shared';
@@ -12,6 +12,8 @@ import { fx, now } from '../game/fx';
 import { consumeMouse, isDown, matches } from '../game/input';
 import { guide } from '../game/guidance';
 import { runtime } from '../game/runtime';
+import { applyCutscene, inCutscene } from '../game/cutscene';
+import { mutter } from '../game/events';
 import type { GameSession } from '../game/session';
 import { findTarget, type Target } from '../game/targeting';
 import { app, type HudState } from '../state/store';
@@ -55,7 +57,7 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
 
   const st = useRef({
     yaw: -Math.PI / 2, pitch: 0, vy: 0, eye: EYE, flash: false, crouch: false, stride: 0, bob: 0,
-    lastHud: 0, target: null as Target | null, reviving: null as string | null, lastStep: 0, spawned: false,
+    lastHud: 0, thinkAt: 0, thought: Math.floor(Math.random() * 8), target: null as Target | null, reviving: null as string | null, lastStep: 0, spawned: false,
     // smoothed torch: aim, brightness and the near-wall dimmer all ease so the light glides
     aim: new THREE.Vector3(0, 0, -1), torchK: 0, wallK: 1, fear: 0,
   });
@@ -163,7 +165,8 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
       s.pitch = runtime.debugLook.pitch;
       runtime.debugLook = null;
     }
-    if (!overlay || overlay === 'journal') {
+    const cine = inCutscene();
+    if ((!overlay || overlay === 'journal') && !cine) {
       const k = 0.0021 * settings.mouseSensitivity;
       s.yaw -= m.dx * k;
       s.pitch -= m.dy * k * (settings.invertY ? -1 : 1);
@@ -184,7 +187,7 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
       s.yaw = hiding.yaw + Math.max(-0.7, Math.min(0.7, d));
       s.pitch = Math.max(-0.5, Math.min(0.4, s.pitch));
       s.flash = false;
-    } else if (alive && (!overlay || overlay === 'journal')) {
+    } else if (alive && (!overlay || overlay === 'journal') && !cine) {
       let ix = 0;
       let iz = 0;
       if (isDown('forward')) iz -= 1;
@@ -240,17 +243,19 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     camera.position.y += Math.sin(tq * 27.1 + 1.3) * Math.sin(tq * 9.7) * shake * 0.03;
     tmpE.set(s.pitch, s.yaw, me.status === 'downed' ? 0.5 : moving ? Math.sin(s.bob * 0.5) * 0.004 * bobAmt : 0);
     camera.quaternion.setFromEuler(tmpE);
+    const cineDir = applyCutscene(camera as THREE.PerspectiveCamera);
     runtime.eye = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
-    const fwd = forwardFromYawPitch(s.yaw, s.pitch);
+    const fwd = cineDir ?? forwardFromYawPitch(s.yaw, s.pitch);
     audio.setListener(runtime.eye, fwd);
 
     // torch: the aim trails the view slightly and every brightness change eases, so the pool of light
     // glides across the walls instead of snapping or strobing
     const g = snap.ghost;
     const gd = Math.hypot(g.pos.x - feet.x, g.pos.y - feet.y, g.pos.z - feet.z);
-    const flashOn = s.flash;
+    // during a cutscene the torch becomes the key light, shining from the camera onto Aditi
+    const flashOn = s.flash || !!cineDir;
     // the found flashlight is a proper beam; before that, Aditi's phone torch
-    const strong = me.hasFlashlight;
+    const strong = me.hasFlashlight || !!cineDir;
     const threatened = gd < 10 && (g.mode === 'hunt' || g.mode === 'warn');
     s.torchK = THREE.MathUtils.damp(s.torchK, flashOn ? (threatened ? 0.35 : 1) : 0, flashOn ? 9 : 14, dt);
     s.aim.lerp(tmpV.set(fwd.x, fwd.y, fwd.z), 1 - Math.exp(-16 * dt)).normalize();
@@ -275,7 +280,7 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     torch.pos.copy(spot.position);
     torch.dir.copy(s.aim);
     torch.cos = Math.cos(strong ? 0.3 : 0.55);
-    held.current = { on: flashOn, strong, intensity: s.torchK, moving, sprinting, hidden: !!hiding || !alive };
+    held.current = { on: flashOn, strong, intensity: s.torchK, moving, sprinting, hidden: !!hiding || !alive || !!cineDir };
 
     // breathing: slow and cold at rest, quicker when moving, ragged when hunted or spent
     s.fear = THREE.MathUtils.damp(s.fear, threatened ? 1 : gd < 14 ? 0.45 : 0, 1.2, dt);
@@ -298,6 +303,12 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     const tn = now();
     if (tn - s.lastHud > 0.1) {
       s.lastHud = tn;
+      // now and then, when nothing is near, Aditi says something to herself
+      if (!s.thinkAt) s.thinkAt = tn + 40;
+      if (tn > s.thinkAt && alive && !hiding && !cine && s.fear < 0.15 && me.characterId === 'aditi' && session.role !== 'ghost') {
+        s.thinkAt = tn + 75 + Math.random() * 60;
+        mutter(ADITI_THOUGHTS.ambient[s.thought++ % ADITI_THOUGHTS.ambient.length]);
+      }
       const zone = zoneAt(level, feet);
       const signalRange = me.characterId === 'aditi' ? 24 : 17;
       let hum = 0;

@@ -80,7 +80,7 @@ export function Watchers({ count = 2 }: { count?: number }) {
   return (
     <>
       {mats.map((m, i) => (
-        <group key={i} visible={false} ref={(el) => {
+        <group key={i} visible={false} userData={{ warm: true }} ref={(el) => {
           groups.current[i] = el;
         }}>
           <Humanoid palette={PALETTE} anim={anims.current[i]} spectral={m} height={0.98} />

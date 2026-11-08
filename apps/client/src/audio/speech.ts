@@ -1,9 +1,14 @@
+import { lineKey } from '@nishi/shared';
 import { audio, FORCE_MUTE } from './engine';
 
 /**
- * Spoken lines use the browser's built-in speech synthesis (no external TTS service, no recordings).
- * When unavailable, subtitles still carry every line.
+ * Spoken lines. A line plays a recorded voice clip when one exists for its exact text
+ * (src/assets/voice/<lineKey(text)>.mp3, listed by scripts/voice-lines.ts); otherwise the browser's
+ * speech synthesis reads it. Subtitles always carry every line.
  */
+const CLIPS = import.meta.glob('../assets/voice/*.mp3', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const clipUrl = (text: string) => CLIPS[`../assets/voice/${lineKey(text)}.mp3`];
+
 let voices: SpeechSynthesisVoice[] = [];
 function refreshVoices() {
   try {
@@ -33,22 +38,53 @@ export interface SpeakOpts {
   enabled: boolean;
 }
 
-export function speak(text: string, o: SpeakOpts) {
-  if (FORCE_MUTE || !o.enabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  try {
-    const u = new SpeechSynthesisUtterance(text);
-    const v = pickVoice(o.voice ?? 'in');
-    if (v) u.voice = v;
-    u.rate = o.rate ?? 0.95;
-    u.pitch = o.pitch ?? 1;
-    u.volume = Math.min(1, audio.dialogueVolume);
-    window.speechSynthesis.speak(u);
-  } catch {
-    /* speech is optional */
-  }
+const playing = new Set<HTMLAudioElement>();
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Speaks a line and resolves when it has finished (or after its reading time when silent). */
+export function speak(text: string, o: SpeakOpts): Promise<void> {
+  const readingTime = 900 + text.length * 60;
+  if (FORCE_MUTE || !o.enabled || typeof window === 'undefined') return wait(readingTime);
+  const url = clipUrl(text);
+  return new Promise<void>((resolve) => {
+    const safety = setTimeout(resolve, readingTime * 2.5);
+    const done = () => {
+      clearTimeout(safety);
+      resolve();
+    };
+    try {
+      if (url) {
+        const a = new Audio(url);
+        // slowed clips drop in pitch too: the garbled announcements and the voice under the hiss
+        a.preservesPitch = false;
+        a.playbackRate = o.rate !== undefined && o.rate <= 0.8 ? o.rate + 0.1 : 1;
+        a.volume = Math.min(1, audio.dialogueVolume);
+        a.onended = a.onerror = () => {
+          playing.delete(a);
+          done();
+        };
+        playing.add(a);
+        void a.play().catch(done);
+        return;
+      }
+      if (!('speechSynthesis' in window)) return void setTimeout(done, readingTime);
+      const u = new SpeechSynthesisUtterance(text);
+      const v = pickVoice(o.voice ?? 'in');
+      if (v) u.voice = v;
+      u.rate = o.rate ?? 0.95;
+      u.pitch = o.pitch ?? 1;
+      u.volume = Math.min(1, audio.dialogueVolume);
+      u.onend = u.onerror = done;
+      window.speechSynthesis.speak(u);
+    } catch {
+      done();
+    }
+  });
 }
 
 export function stopSpeech() {
+  for (const a of playing) a.pause();
+  playing.clear();
   try {
     window.speechSynthesis?.cancel();
   } catch {

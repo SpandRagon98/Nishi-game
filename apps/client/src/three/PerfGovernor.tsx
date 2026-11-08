@@ -8,9 +8,11 @@ const FLOOR = 42;
 const CEIL = 56;
 
 /**
- * Adaptive quality: measures real frame times and trades render resolution (then AO, then
- * post-processing) for frame rate, so the game holds ~45–60 fps from gaming laptops down to
- * integrated graphics. Resolution changes are small steps and rate-limited so they are not noticed.
+ * Adaptive quality: measures real frame times and trades render resolution (then AO) for frame rate,
+ * so the game holds ~45–60 fps from gaming laptops down to integrated graphics. Resolution changes are
+ * small steps and rate-limited so they are not noticed. AO goes off at most once and never comes back
+ * mid-game, and post-processing is never toggled here: switching passes recompiles shaders, which
+ * freezes the frame for a third of a second and pops the look (the Caller's eyes stop glowing).
  */
 export function PerfGovernor({ profile }: { profile: GraphicsProfile }) {
   const gl = useThree((s) => s.gl);
@@ -66,13 +68,12 @@ export function PerfGovernor({ profile }: { profile: GraphicsProfile }) {
         // bigger steps when far below the floor
         s.dpr = Math.max(profile.minDpr, s.dpr * (fps < FLOOR * 0.7 ? 0.8 : 0.9));
         setDpr(s.dpr);
-      } else if (s.degrade < 2) s.degrade++;
+      } else if (s.degrade < 1) s.degrade++;
       usePerf.setState({ dpr: s.dpr, degrade: s.degrade });
     } else if (s.fast >= 5 && since > 4) {
       s.fast = 0;
       s.lastChange = s.clock;
-      if (s.degrade > 0 && s.dpr >= profile.dpr - 0.01) s.degrade--;
-      else if (s.dpr < profile.dpr - 0.01) {
+      if (s.dpr < profile.dpr - 0.01) {
         s.dpr = Math.min(profile.dpr, s.dpr + 0.05);
         setDpr(s.dpr);
       }

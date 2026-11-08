@@ -56,7 +56,12 @@ export function objectiveStep(level: LevelDef, snap: WorldSnapshot, me: Survivor
       return { target: itemPos(level, snap, 'fuse_box')!, step: 'Set the fuses at the fuse box' };
     }
     case 'decode':
-      return { target: itemPos(level, snap, 'pa_console')!, step: 'Enter the reel numbers at the announcement console' };
+      return {
+        target: itemPos(level, snap, 'pa_console')!,
+        step: snap.world.decodeOrder
+          ? `Enter ${snap.world.decodeOrder.map((r) => snap.world.reelDigits[`reel_${r.toLowerCase()}`] ?? '?').join(' ')} at the announcement console`
+          : 'Wait for the announcement at the console',
+      };
     case 'exit':
       return { target: itemPos(level, snap, 'exit_gate')!, step: 'Start the gate motor' };
     case 'escape': {

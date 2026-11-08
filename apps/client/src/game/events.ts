@@ -1,12 +1,20 @@
-import { OBJECTIVES, applyMatchResult, type MatchResult, type SimEvent } from '@nishi/shared';
+import { ADITI_THOUGHTS, OBJECTIVES, PLATFORM_ZERO, applyMatchResult, type MatchResult, type SimEvent } from '@nishi/shared';
 import { audio } from '../audio/engine';
 import { speak } from '../audio/speech';
 import { app, useApp } from '../state/store';
+import { CUT_SECONDS, playCutscene } from './cutscene';
 import { addApparition, fx, now } from './fx';
 import type { GameSession } from './session';
 
 export function releasePointer() {
   if (document.pointerLockElement) document.exitPointerLock();
+}
+
+/** Aditi talking to herself: a quiet subtitle and her voice. */
+export function mutter(text: string) {
+  const s = app();
+  s.subtitle({ speaker: 'ADITI', text, kind: 'thought' }, 1500 + text.length * 55);
+  void speak(text, { enabled: s.settings.voiceLines, voice: 'female', rate: 0.95, pitch: 1.05 });
 }
 
 /** Routes authoritative simulation events into UI, audio and visual effects. */
@@ -41,7 +49,11 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
       break;
     case 'phone':
       s.subtitle({ speaker: 'TELEPHONE', text: e.text, kind: 'phone' });
-      speak(e.text.replace(/^[^"]*"|".*$/g, ''), { enabled: voiceOn, voice: 'female', rate: 0.85, pitch: 0.8 });
+      {
+        // only the quoted words are a voice on the line; the rest is description
+        const quoted = e.text.match(/"([^"]+)"/)?.[1];
+        if (quoted) void speak(quoted, { enabled: voiceOn, voice: 'female', rate: 0.85, pitch: 0.8 });
+      }
       if (story) s.beat('phone');
       break;
     case 'pickup':
@@ -114,7 +126,12 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
       const o = OBJECTIVES.find((x) => x.id === e.id)!;
       const next = OBJECTIVES.find((x) => x.id !== e.id && !session.snapshot()?.world.objectives[x.id]);
       s.toast({ title: `✓ ${o.title}`, text: next && !story ? `Next: ${next.title}` : undefined, tone: 'good' }, 3500);
-      if (story) s.beat(e.id);
+      if (!story) break;
+      // a short cutscene, Aditi's own words over it, then the story card
+      const cut = !!snap && !!me && playCutscene(e.id, me, PLATFORM_ZERO, snap);
+      const thought = ADITI_THOUGHTS.after[e.id];
+      if (thought && me?.characterId === 'aditi') setTimeout(() => mutter(thought), cut ? 1300 : 600);
+      setTimeout(() => app().beat(e.id), cut ? CUT_SECONDS * 1000 : 0);
       break;
     }
     case 'checkpoint':

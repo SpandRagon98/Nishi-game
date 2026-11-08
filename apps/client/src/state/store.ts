@@ -12,7 +12,7 @@ export interface Subtitle {
   id: number;
   speaker: string;
   text: string;
-  kind: 'radio' | 'announcement' | 'whisper' | 'phone' | 'tape' | 'system';
+  kind: 'radio' | 'announcement' | 'whisper' | 'phone' | 'tape' | 'system' | 'thought';
   fake?: boolean;
   start: number;
   end: number;

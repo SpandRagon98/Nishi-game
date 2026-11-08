@@ -1157,7 +1157,8 @@ function formant(ctx: BaseAudioContext, input: AudioNode, out: AudioNode, f: num
  */
 export function renderBreath(ctx: BaseAudioContext, dest: AudioNode, t: number, p: BreathParams) {
   const man = p.voice === 'man';
-  const fs = (man ? 0.84 : 1) * (1 + (Math.random() * 2 - 1) * 0.05);
+  // a woman's shorter vocal tract puts every airflow resonance ~17% higher and the breath lighter and airier
+  const fs = (man ? 0.84 : 1.17) * (1 + (Math.random() * 2 - 1) * 0.05);
   const mouth = !p.hiding && (p.effort > 0.4 || p.fear > 0.55 || p.down);
   const pink = pinkNoise(ctx);
   const N = 256;
@@ -1191,7 +1192,7 @@ export function renderBreath(ctx: BaseAudioContext, dest: AudioNode, t: number, 
     hiss.type = 'highpass';
     hiss.frequency.value = 3600;
     const hg = ctx.createGain();
-    hg.gain.value = 0.16;
+    hg.gain.value = man ? 0.16 : 0.24;
     inSrc.connect(hiss).connect(hg).connect(inBus);
   } else {
     // through the nose: narrow and nasal, cold air drawn in quietly
@@ -1228,9 +1229,9 @@ export function renderBreath(ctx: BaseAudioContext, dest: AudioNode, t: number, 
   formant(ctx, exSrc, exBus, 2600 * fs, 6, mouth ? 0.24 : 0.12, t2, p.exh);
   const bodyLp = ctx.createBiquadFilter();
   bodyLp.type = 'lowpass';
-  bodyLp.frequency.value = mouth ? 1900 : 1200;
+  bodyLp.frequency.value = (mouth ? 1900 : 1200) * (man ? 1 : 1.35);
   const bodyG = ctx.createGain();
-  bodyG.gain.value = 0.3;
+  bodyG.gain.value = man ? 0.3 : 0.17; // less chest in a woman's breath
   exSrc.connect(bodyLp).connect(bodyG).connect(exBus);
   exBus.connect(exG).connect(dest);
   exSrc.start(t2, Math.random() * 2);
@@ -1239,7 +1240,7 @@ export function renderBreath(ctx: BaseAudioContext, dest: AudioNode, t: number, 
   // ── voiced onset: the vocal folds catch for an instant on a hard or frightened out-breath ──
   const voiced = Math.max(p.effort - 0.5, 0) * 1.6 + Math.max(p.fear - 0.5, 0) * 1.4 + (p.down ? 0.6 : 0);
   if (voiced > 0.05 && !p.hiding && Math.random() < 0.85) {
-    const f0 = (man ? 112 : 208) * (1 + (Math.random() * 2 - 1) * 0.06);
+    const f0 = (man ? 112 : 228) * (1 + (Math.random() * 2 - 1) * 0.06);
     const dur = 0.16 + Math.random() * 0.12 + (p.down ? 0.25 : 0);
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth';

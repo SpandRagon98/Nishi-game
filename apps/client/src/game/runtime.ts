@@ -11,4 +11,6 @@ export const runtime = {
   menu: false,
   /** dev-only: force the local view direction once (automated screenshots) */
   debugLook: null as { yaw: number; pitch: number } | null,
+  /** dev-only: pin the Caller in view (automated screenshots) */
+  debugCaller: null as WorldSnapshot['ghost'] | null,
 };

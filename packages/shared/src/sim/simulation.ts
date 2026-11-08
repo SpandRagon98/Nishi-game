@@ -453,7 +453,11 @@ export class MatchSimulation {
       case 'pa_console': {
         if (!w.power) return fail('The console is dead. No power.');
         if (w.decoded) return fail('The announcement has already been decoded.');
-        if (!w.objectives.reels) return fail('You need all three reels to decode the announcement.');
+        if (!w.objectives.reels) {
+          // the console replays the last announcement, so the reel order can never be missed for good
+          if (w.decodeOrder) this.emit({ type: 'announcement', text: ANNOUNCEMENTS.decodeOrder(w.decodeOrder), to: [id] });
+          return fail('You need all three reels to decode the announcement.');
+        }
         this.emit({ type: 'puzzle', puzzle: 'keypad', to: [id] });
         return { ok: true };
       }

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { fx, now } from '../game/fx';
 import { runtime } from '../game/runtime';
+import { CallerFigure, type GhostControl } from './Ghost';
 
 export interface AnimState {
   speed: number;
@@ -187,11 +188,10 @@ const CALLER_PALETTE = { coat: '#000', accent: '#000', trousers: '#000', skin: '
 /** The hunting / stunned Caller as seen by survivors. */
 export function GhostActor() {
   const group = useRef<THREE.Group>(null);
-  const mat = useMemo(() => spectralMaterial(), []);
-  const anim = useRef<AnimState>({ speed: 0, crouch: false, down: false, phase: 0 });
+  const control = useRef<GhostControl>({ opacity: 0, speed: 0, stunned: false });
   const last = useRef(new THREE.Vector3());
   useFrame((_, dt) => {
-    const g = runtime.snap?.ghost;
+    const g = (import.meta.env.DEV && runtime.debugCaller) || runtime.snap?.ghost;
     const grp = group.current;
     if (!g || !grp) return;
     const t = now();
@@ -202,23 +202,22 @@ export function GhostActor() {
     if (grp.position.distanceTo(target) > 4) grp.position.copy(target);
     else grp.position.lerp(target, Math.min(1, dt * 10));
     grp.rotation.y = THREE.MathUtils.lerp(grp.rotation.y, g.yaw + Math.PI, Math.min(1, dt * 8));
-    anim.current.speed = dt > 0 ? Math.min(6, last.current.distanceTo(grp.position) / dt) : 0;
+    const c = control.current;
+    c.speed = dt > 0 ? Math.min(1, last.current.distanceTo(grp.position) / dt / 5) : 0;
     last.current.copy(grp.position);
-    mat.uniforms.uTime.value = t;
-    const stunned = g.mode === 'stunned' ? 1 : 0;
-    mat.uniforms.uStun.value = stunned;
-    mat.uniforms.uOpacity.value = warn ? 0.22 + 0.12 * Math.sin(t * 1.6) : 0.88 + 0.06 * Math.sin(t * 2.3);
+    c.stunned = g.mode === 'stunned';
+    c.opacity = warn ? 0.22 + 0.12 * Math.sin(t * 1.6) : 0.94;
   });
   return (
-    <group ref={group} visible={false}>
-      <Humanoid palette={CALLER_PALETTE} anim={anim} spectral={mat} height={1.08} />
+    <group ref={group} visible={false} userData={{ warm: true }}>
+      <CallerFigure control={control} />
     </group>
   );
 }
 
 /** Director apparitions / shadows and ghost-player apparitions (render-only). Three pooled slots. */
 export function Apparitions() {
-  const slots = useMemo(() => [0, 1, 2].map(() => ({ spectral: spectralMaterial(), shadow: shadowMaterial() })), []);
+  const slots = useMemo(() => [0, 1, 2].map(() => ({ spectral: { opacity: 0, speed: 0, stunned: false } as GhostControl, shadow: shadowMaterial() })), []);
   const refs = useRef<{ spectral: THREE.Group | null; shadow: THREE.Group | null }[]>([0, 1, 2].map(() => ({ spectral: null, shadow: null })));
   const anims = useRef([0, 1, 2].map(() => ({ current: { speed: 0, crouch: false, down: false, phase: 0 } as AnimState })));
   useFrame(() => {
@@ -235,9 +234,11 @@ export function Apparitions() {
         if (!on) continue;
         g.position.set(a.pos.x, a.pos.y, a.pos.z);
         g.rotation.y = a.yaw + Math.PI;
-        const m = slots[i][kind];
-        m.uniforms.uTime.value = t;
-        m.uniforms.uOpacity.value = Math.min(1, (a.until - t) * 2) * (kind === 'shadow' ? 0.9 : 0.8);
+        const fade = Math.min(1, (a.until - t) * 2);
+        if (kind === 'shadow') {
+          slots[i].shadow.uniforms.uTime.value = t;
+          slots[i].shadow.uniforms.uOpacity.value = fade * 0.9;
+        } else slots[i].spectral.opacity = fade * 0.85;
       }
     });
   });
@@ -245,10 +246,14 @@ export function Apparitions() {
     <>
       {slots.map((m, i) =>
         (['spectral', 'shadow'] as const).map((kind) => (
-          <group key={`${i}${kind}`} visible={false} ref={(el) => {
+          <group key={`${i}${kind}`} visible={false} userData={{ warm: true }} ref={(el) => {
             refs.current[i][kind] = el;
           }}>
-            <Humanoid palette={CALLER_PALETTE} anim={anims.current[i]} spectral={m[kind]} height={1.05} />
+            {kind === 'shadow' ? (
+              <Humanoid palette={CALLER_PALETTE} anim={anims.current[i]} spectral={m.shadow} height={1.05} />
+            ) : (
+              <CallerFigure control={{ current: m.spectral }} />
+            )}
           </group>
         )),
       )}

@@ -1,4 +1,5 @@
 import {
+  ANNOUNCEMENTS,
   ACHIEVEMENTS, DOCUMENTS, FUSE_LABELS, FUSE_VALUES, GHOST_ABILITIES, OBJECTIVES, RADIO_PRESETS, STORY_BEATS, SURVIVORS, logbookText,
   type GhostAbilityId, type WorldSnapshot,
 } from '@nishi/shared';
@@ -135,7 +136,7 @@ function FpsMeter() {
   return (
     <div className="fps-meter" aria-hidden>
       <b className={p.fps >= 45 ? 'ok' : p.fps >= 30 ? 'mid' : 'bad'}>{p.fps} fps</b> · {p.worst} ms worst · {Math.round(p.dpr * 100)}% res · {p.calls} calls
-      {p.degrade > 0 && ` · ${p.degrade === 1 ? 'AO off' : 'post off'}`}
+      {p.degrade > 0 && ' · AO off'}
     </div>
   );
 }
@@ -500,13 +501,13 @@ function Keypad({ session }: { session: GameSession }) {
         <div className="row">
           <Btn onClick={closeOverlay}>Step away (Esc)</Btn>
         </div>
-        <KeypadHelp w={w} />
+        <KeypadHelp w={w} session={session} />
       </div>
     </div>
   );
 }
 
-function KeypadHelp({ w }: { w: WorldSnapshot['world'] }) {
+function KeypadHelp({ w, session }: { w: WorldSnapshot['world']; session: GameSession }) {
   const reels = (['reel_a', 'reel_b', 'reel_c'] as const).filter((r) => w.collected.includes(r));
   if (!reels.length) return <p className="muted small">The numbers are on the three SHUNYA reels.</p>;
   return (
@@ -516,6 +517,14 @@ function KeypadHelp({ w }: { w: WorldSnapshot['world'] }) {
       {w.decodeOrder
         ? `Announced order: reel ${w.decodeOrder.join(' → ')}${reels.length === 3 ? ` → enter ${w.decodeOrder.map((r) => w.reelDigits[`reel_${r.toLowerCase()}` as 'reel_a']).join('')}` : ''}`
         : 'Wait for the announcement to call out the order.'}
+      {w.decodeOrder && (
+        <>
+          <br />
+          <Btn small onClick={() => handleSimEvent({ type: 'announcement', text: ANNOUNCEMENTS.decodeOrder(w.decodeOrder!) }, session)}>
+            🔊 Replay the announcement
+          </Btn>
+        </>
+      )}
     </p>
   );
 }

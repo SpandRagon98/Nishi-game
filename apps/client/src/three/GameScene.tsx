@@ -23,6 +23,7 @@ import { LevelColliders, LevelMeshes, makeMaterials } from './Level';
 import { PassageDetail } from './Passage';
 import { LightRig } from './Lights';
 import { SurvivorController } from './SurvivorController';
+import { inCutscene } from '../game/cutscene';
 import { cachedTextures } from './textures';
 import { Horizon } from './Weather';
 import { DustMotes, MistBanks, Moon, useNightSky } from './Atmosphere';
@@ -42,7 +43,8 @@ function SceneSetup() {
   useFrame(() => {
     const s = app().settings;
     gl.toneMappingExposure = 0.6 * s.brightness;
-    if (camera.fov !== s.fov) {
+    // a running cutscene owns the lens
+    if (camera.fov !== s.fov && !inCutscene()) {
       camera.fov = s.fov;
       camera.updateProjectionMatrix();
     }
@@ -94,6 +96,46 @@ function GameLoop({ session }: { session: GameSession }) {
   return null;
 }
 
+/**
+ * Draws everything once, off-screen, before play: including the ghost, apparitions and watchers that
+ * start hidden (tagged `userData.warm`), with culling off so they draw wherever they stand. Otherwise
+ * her first appearance freezes the frame for up to a second while her shaders compile (Direct3D
+ * finishes compiling on the first real draw, so compiling alone is not enough). With post-processing
+ * the scene renders into a buffer, which uses a different shader variant (no tone mapping), so warm
+ * into a 1x1 target; without it, draw to a single scissored pixel of the screen.
+ */
+function Warmup({ post }: { post: boolean }) {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    const hidden: THREE.Object3D[] = [];
+    scene.traverse((o) => {
+      if (o.userData.warm && !o.visible) hidden.push(o);
+    });
+    const culled: THREE.Object3D[] = [];
+    for (const h of hidden) {
+      h.visible = true;
+      h.traverse((o) => {
+        if (o.frustumCulled) culled.push(o);
+        o.frustumCulled = false;
+      });
+    }
+    const target = post ? new THREE.WebGLRenderTarget(1, 1) : null;
+    const prev = gl.getRenderTarget();
+    gl.setRenderTarget(target);
+    if (!target) {
+      gl.setScissor(0, 0, 1, 1);
+      gl.setScissorTest(true);
+    }
+    gl.render(scene, camera);
+    gl.setScissorTest(false);
+    gl.setRenderTarget(prev);
+    target?.dispose();
+    for (const o of culled) o.frustumCulled = true;
+    for (const o of hidden) o.visible = false;
+  }, [gl, scene, camera, post]);
+  return null;
+}
+
 export function GameCanvas({ session }: { session: GameSession }) {
   const graphics = useApp((s) => s.settings.graphics);
   const gp = graphicsProfile(graphics);
@@ -139,7 +181,8 @@ export function GameCanvas({ session }: { session: GameSession }) {
         <Apparitions />
         <RemoteSurvivors localId={session.localId} ghostVision={ghost} />
         <GameLoop session={session} />
-        {gp.post && degrade < 2 && <Effects ghostVision={ghost} ao={gp.ao && degrade < 1} />}
+        {gp.post && <Effects ghostVision={ghost} ao={gp.ao && degrade < 1} />}
+        <Warmup post={gp.post} />
         <PerfGovernor profile={gp} />
       </Suspense>
     </Canvas>

@@ -43,7 +43,7 @@ export function Loading() {
       useApp.setState({ session: new NetworkSession(start.room) });
     } else {
       useApp.setState({
-        session: new LocalSession({ name: s.profile.name, characterId: s.profile.selectedSurvivor, intensity: intensityValue(s.settings.intensity) }),
+        session: new LocalSession({ name: s.profile.name, characterId: 'aditi' /* the story is Aditi's; Kabir waits in the car */, intensity: intensityValue(s.settings.intensity) }),
       });
     }
     go('game');

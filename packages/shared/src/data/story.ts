@@ -7,7 +7,7 @@ export const OBJECTIVES: { id: ObjectiveId; title: string; hint: string }[] = [
   { id: 'office', title: "Search the station master's office", hint: 'Cross the platform to the green door in the middle of the station building. Read the logbook (E), then open the desk drawer for the key.' },
   { id: 'reels', title: 'Recover the three SHUNYA audio reels', hint: 'Follow the marker to each reel. Up close they hiss like a running tape. Each one gives a number: your journal (Tab) keeps them.' },
   { id: 'power', title: 'Restore electricity at the fuse box', hint: 'Unlock the Maintenance Room (east end of the building) with the key. Set each fuse to the rating from the logbook; the fuse panel shows it.' },
-  { id: 'decode', title: 'Decode the platform announcement', hint: 'Listen to the announcement for the reel order, then enter the reel numbers at the console in the Signal Room. The console shows what you know.' },
+  { id: 'decode', title: 'Decode the platform announcement', hint: 'Enter the reel numbers at the console in the Signal Room in the order the announcement called. Missed it? The console and your journal (Tab) keep the order, and the console can replay it.' },
   { id: 'exit', title: 'Open the station exit', hint: 'Go to the collapsible gate at the back of the Waiting Hall and start the gate motor (E).' },
   { id: 'escape', title: 'Escape before the Caller takes you', hint: 'Run through the exit corridor behind the gate to the street. Do not stop.' },
 ];
@@ -21,7 +21,7 @@ export type StoryBeatId = 'arrival' | ObjectiveId | 'first_hunt' | 'reel_1' | 'r
 export const STORY_BEATS: Record<StoryBeatId, { title: string; text: string; next?: string }> = {
   arrival: {
     title: '03:13 AM · Nishipur Junction',
-    text: 'The gate slammed shut behind you. The timetable still reads 3:13, as it has since the night your mother vanished here in 1999. The tape said she is still on this platform. Something here has learned her voice.',
+    text: 'Kabir parked by the gate and stayed in the car with the radio on. The moment you stepped inside, the gate slammed shut behind you. The timetable still reads 3:13, as it has since the night your mother vanished here in 1999. The tape said she is still on this platform. Something here has learned her voice.',
     next: 'Find a light. There is a red emergency kit on the bench just ahead.',
   },
   flashlight: {
@@ -58,7 +58,7 @@ export const STORY_BEATS: Record<StoryBeatId, { title: string; text: string; nex
   power: {
     title: 'The station wakes',
     text: 'The tubes stutter on, one platform at a time. The public address speakers hum. They have been waiting since 1999 to finish an announcement.',
-    next: 'Listen for the reel order, then enter the numbers at the console in the Signal Room.',
+    next: 'Listen for the reel order, then enter the numbers at the console in the Signal Room. The console can replay the announcement.',
   },
   decode: {
     title: 'The third call, answered',
@@ -120,21 +120,47 @@ export const DOCUMENTS: Record<string, { title: string; body: string }> = {
   },
 };
 
+/** The cassette, then the phone call with Kabir: [speaker ('' = the tape), line, voice]. */
+export const PROLOGUE_TAPE = [
+  ['', "Aditi... if you're hearing this, I'm still at the station.", 'female'],
+  ['', "Platform Zero. It isn't on any map. They built it for the recordings.", 'female'],
+  ['', "It copies voices. It copied mine. Don't answer it when it calls the third time.", 'female'],
+] as const;
+
+export const PROLOGUE_CALL = [
+  ['KABIR', "Aditi? It's two in the morning. What happened?", 'male'],
+  ['ADITI', "It's her, Kabir. Ma's voice, on a tape. She says she's at Nishipur Junction. I'm going tonight.", 'female'],
+  ['KABIR', "Then I'm driving you. I'll wait in the car outside with the radio on. No arguments.", 'male'],
+  ['ADITI', 'Okay. Thank you, Kabir.', 'female'],
+] as const;
+
+/** Stable short key for a spoken line (FNV-1a): recorded clips are stored as <key>.mp3. */
+export function lineKey(text: string) {
+  let h = 0x811c9dc5;
+  for (const ch of text.trim()) {
+    h ^= ch.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
 export const PHONE_LINES = [
   'A woman\'s voice, very far away: "Aditi? Is that you? Don\'t come to the platform..." The line goes dead.',
   'Static. Then your own voice, recorded, saying words you have never said.',
   'A railway clerk reads out a list of names. Yours is the last one.',
 ];
 
+const KABIR = 'KABIR (radio, from the car)';
+
 export const RADIO = {
   intro: [
-    { speaker: 'DEV (archive liaison)', text: 'Aditi, radio check. The exit gate sealed itself the moment you went in. Whatever runs this station is still on the old SHUNYA circuit.' },
-    { speaker: 'DEV (archive liaison)', text: "Your mother's unit hid three reels here in 1999. Find them, get the power back, and the gate motor should answer. Torch first: there's an emergency kit on the bench right by you. And don't trust the announcements." },
+    { speaker: KABIR, text: "Aditi, radio check. I'm right outside in the car. The gate shut behind you the second you went in, and I can't move it from here." },
+    { speaker: KABIR, text: "Your mother's unit hid three reels in there. Find them, get the power back, and the gate motor should answer. Torch first: there's an emergency kit on the bench right by you. And don't trust the announcements." },
   ],
-  afterFlashlight: { speaker: 'DEV (archive liaison)', text: "Good. Now the station master's office: green door, middle of the building. He kept a logbook, and the maintenance key." },
-  afterOffice: { speaker: 'DEV (archive liaison)', text: "Remember that logbook: the fuse ratings are in it. First the three reels. They hiss when you're close." },
-  afterPower: { speaker: 'DEV (archive liaison)', text: 'Power is up. Listen to the announcement. It will give the order of the reels. Use the console in the signal room.' },
-  afterDecode: { speaker: 'DEV (archive liaison)', text: 'The gate motor is live. Open it and run. Do not stop on the platform.' },
+  afterFlashlight: { speaker: KABIR, text: "I can see your light through the gate. Now the station master's office: green door, middle of the building. He kept a logbook, and the maintenance key." },
+  afterOffice: { speaker: KABIR, text: "Keep that logbook in your head: the fuse ratings are in it. First the three reels. They hiss when you're close." },
+  afterPower: { speaker: KABIR, text: "The lights just came on out here too. Listen to the announcement: it gives the order of the reels. If you miss it, the console in the signal room plays it again." },
+  afterDecode: { speaker: KABIR, text: "The gate motor is live. Open it and run. I've got the car door open. Don't stop on the platform." },
   huntWarning: { speaker: 'RADIO', text: '— — static rises — —' },
 };
 
@@ -148,6 +174,28 @@ export const ANNOUNCEMENTS = {
     'Platform Zero... Platform Zero... somebody is waiting for you on Platform Zero.',
     'We regret to inform you that the last train has already left. We regret to inform you. We regret.',
   ],
+};
+
+/** Aditi talking to herself: now and then while exploring, and after each task. */
+export const ADITI_THOUGHTS: { ambient: string[]; after: Partial<Record<ObjectiveId, string>> } = {
+  ambient: [
+    "It's so cold in here. I can see my breath.",
+    'Nobody has been here in years. So why does it smell of smoke?',
+    "Hello? ...No. Don't call out, Aditi.",
+    'Ma walked on these same tiles. Twenty-seven years ago.',
+    "That's just the wind. It's just the wind.",
+    'Keep moving. Kabir is right outside.',
+    'Why does every clock here stop at three thirteen?',
+    'Somebody was sitting here. The dust is still warm.',
+  ],
+  after: {
+    flashlight: "Ma's torch. It still works. Of course it does.",
+    office: 'Three reels, three numbers. Okay. I can do this.',
+    reels: "That's all three. Now the power.",
+    power: 'Light. Finally. Now I just have to listen.',
+    decode: 'That was her voice. Ma...',
+    exit: "Run. Don't look back.",
+  },
 };
 
 export const WHISPERS = [
