@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { audio } from './audio/engine';
 import { music } from './audio/music';
-import { installInput } from './game/input';
+import { TOUCH, enterFullscreen, installInput } from './game/input';
 import { graphicsProfile } from './state/settings';
 import { useApp } from './state/store';
 import { getTextures } from './three/textures';
@@ -49,13 +49,15 @@ export function App() {
   const [bootProgress, setBootProgress] = useState(0);
   const [booted, setBooted] = useState(false);
   const [gl] = useState(webglAvailable);
-  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches && !window.matchMedia?.('(pointer: fine)').matches;
 
   useEffect(() => {
     installInput();
     void useApp.getState().initProfile();
     void getTextures(graphicsProfile(useApp.getState().settings.graphics).textureSize, setBootProgress).then(() => setBooted(true));
+    document.documentElement.classList.toggle('touch', TOUCH);
     const unlock = () => {
+      // phones play fullscreen and sideways; browsers only allow it from a tap
+      if (TOUCH && !document.fullscreenElement) void enterFullscreen();
       audio.unlock();
       audio.startAmbience();
       music.kick();
@@ -87,7 +89,7 @@ export function App() {
     return (
       <div className="fatal">
         <h1>NISHI</h1>
-        <p>This game needs WebGL. Please use a current desktop version of Chrome, Edge, Firefox or Safari with hardware acceleration enabled.</p>
+        <p>This game needs WebGL. Please use a current version of Chrome, Edge, Firefox or Safari with hardware acceleration enabled.</p>
       </div>
     );
   }
@@ -95,9 +97,7 @@ export function App() {
 
   return (
     <div className="app">
-      {touch && screen === 'menu' && (
-        <div className="touch-note">NISHI is built for desktop browsers with a keyboard and mouse. Touch controls are not supported yet.</div>
-      )}
+      {TOUCH && <div className="rotate-note">Turn your phone sideways to play</div>}
       {screen === 'menu' && <MainMenu />}
       {screen === 'prologue' && <Prologue />}
       {screen === 'characters' && <CharacterSelect />}

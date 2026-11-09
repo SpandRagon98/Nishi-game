@@ -29,7 +29,8 @@ export function MainMenu() {
       ? { label: 'Continue the Story', sub: 'Chapter 1 · Platform Zero', act: () => playSolo(false) }
       : { label: 'Begin the Story', sub: 'Start here · the cassette, then Platform Zero', act: () => playSolo(true) },
     ...(seen ? [{ label: 'Replay the Prologue', sub: "Your mother's cassette", act: () => playSolo(true) }] : []),
-    { label: 'Multiplayer', sub: hasReconnectToken() ? 'Rejoin your last room, or start a new one' : '1–4 survivors · optional playable Caller', act: () => go('lobby') },
+    // the hosted build (GitHub Pages) has no game server, so it is story-only
+    ...(import.meta.env.VITE_SOLO_ONLY ? [] : [{ label: 'Multiplayer', sub: hasReconnectToken() ? 'Rejoin your last room, or start a new one' : '1–4 survivors · optional playable Caller', act: () => go('lobby') }]),
     { label: 'Character Selection', sub: 'Survivors and the Caller', act: () => go('characters') },
     { label: 'Story Chapters', sub: 'Eight locations · one voice', act: () => go('chapters') },
     { label: 'Unlocks & Progression', sub: `${profile.achievements.length} achievements · ${profile.collectibles.length} fragments`, act: () => go('unlocks') },

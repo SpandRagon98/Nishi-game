@@ -9,7 +9,8 @@ import { stopSpeech } from '../audio/speech';
 import { handleSimEvent } from '../game/events';
 import { forgetReconnect } from '../game/net';
 import { netState, NetworkSession, type GameSession } from '../game/session';
-import { enterFullscreen, lockPointer } from '../game/input';
+import { TOUCH, enterFullscreen, lockPointer } from '../game/input';
+import { TouchControls } from './TouchControls';
 import { resetFx } from '../game/fx';
 import { LocalSession } from '../game/session';
 import { intensityValue } from '../state/settings';
@@ -578,7 +579,7 @@ function PauseMenu({ session }: { session: GameSession }) {
             <div className="col">
               <Btn primary onClick={closeOverlay}>Resume</Btn>
               <Btn onClick={() => setSettings(true)}>Settings</Btn>
-              <Btn onClick={() => void enterFullscreen()}>Fullscreen (locks Ctrl / Tab keys)</Btn>
+              <Btn onClick={() => void enterFullscreen()}>{TOUCH ? 'Fullscreen' : 'Fullscreen (locks Ctrl / Tab keys)'}</Btn>
               {session.kind === 'solo' && <Btn onClick={restartSolo}>Restart chapter</Btn>}
               <Btn onClick={quitToMenu}>Quit to main menu</Btn>
             </div>
@@ -708,7 +709,8 @@ export function GameView() {
       <ChatFeed />
       <Subtitles />
       <Toasts />
-      {!locked && !overlay && <div className="click-hint">Click to take control</div>}
+      {!locked && !overlay && !TOUCH && <div className="click-hint">Click to take control</div>}
+      {TOUCH && session.role !== 'ghost' && <TouchControls />}
       {overlay === 'journal' && <Journal session={session} />}
       {overlay === 'doc' && <DocViewer session={session} />}
       {overlay === 'fuse' && <FusePuzzle session={session} />}

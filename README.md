@@ -60,6 +60,13 @@ To test from another device on your LAN, open `http://<your-ip>:5173`. The clien
 
 Browsers reserve **Ctrl+W** outside fullscreen. Use **C** to crouch, or use **Pause → Fullscreen**, which also locks Ctrl and Tab.
 
+### Phones and tablets
+Hold the phone sideways. The first tap goes fullscreen (and locks landscape on Android).
+- **Left half:** a thumbstick appears wherever your thumb lands. Push it to the rim to sprint.
+- **Right half:** drag to look around.
+- **Buttons:** Use (hold to revive), Torch, the character ability, Crouch (toggle), Journal and pause.
+- **iPhone:** Safari cannot make a web page fullscreen. Tap *Share → Add to Home Screen*; the game then opens from its own icon with no browser bars.
+
 ---
 
 ## What is in this build
@@ -150,6 +157,9 @@ apps/client         Vite + React 19 + React Three Fiber 9 + Rapier 2 + postproce
 
 ## Deployment
 
+### GitHub Pages (story mode)
+`.github/workflows/deploy.yml` tests, builds and publishes the game to GitHub Pages on every push to `main`. That build sets `VITE_SOLO_ONLY=1`, which removes Multiplayer from the menu, because Pages only serves static files. Asset paths are relative (`base: './'`), so the build works from the `/<repo>/` subfolder.
+
 ### Frontend (static hosting)
 1. Set the server URL at build time: `VITE_SERVER_URL=wss://your-game-server.example.com` (see `apps/client/.env.example`).
 2. Run `npm run build`.
@@ -176,7 +186,7 @@ The renderer is built to hold 40–60 fps on ordinary laptops, and its tiers are
 - **Static batching** (`three/StaticBatch.tsx`): after load, everything in the station scenery that never moves is merged per material in 16 m cells. That is about 1,000 meshes in about 100 draw calls. Fans, flames and swinging lamps are detected and left alone.
 - **Measured** on Intel Iris Xe at about 980×850 on Medium: draw calls fell from about 1,300 to 90–360 a frame depending on the view, and the frame rate holds 50–60 fps. Before these changes it was far below that.
 - Rapier ships as a large WASM bundle (~1.1 MB gzipped). The first load shows a "Threading the tape…" cover while it initialises.
-- **Mobile:** the Mobile tier (half resolution, two lights, no post-processing) is in place. Touch controls and a mobile HUD are the remaining work before hosting for phones.
+- **Mobile:** phones get the Mobile tier (half resolution, two lights, no post-processing), touch controls (`ui/TouchControls.tsx`) and a compact layout for short landscape screens. It has been checked in a phone-sized emulator, not yet on a real phone.
 
 ## Next steps
 1. Replace blockout props and characters with modelled, appropriately licensed glTF assets. Use KTX2 textures and add baked lightmaps.

@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { audio } from '../audio/engine';
 import { fx, now } from '../game/fx';
-import { consumeMouse, isDown, matches } from '../game/input';
+import { consumeMouse, isDown, matches, stick } from '../game/input';
 import { guide } from '../game/guidance';
 import { runtime } from '../game/runtime';
 import { applyCutscene, inCutscene } from '../game/cutscene';
@@ -194,11 +194,13 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
       if (isDown('back')) iz += 1;
       if (isDown('left')) ix -= 1;
       if (isDown('right')) ix += 1;
+      ix += stick.x;
+      iz += stick.y;
       const len = Math.hypot(ix, iz);
       moving = len > 0;
       s.crouch = isDown('crouch');
       // sprint never tires out; Kabir's Adrenaline adds a burst on top
-      sprinting = moving && isDown('sprint') && !s.crouch;
+      sprinting = moving && (isDown('sprint') || Math.hypot(stick.x, stick.y) > 0.92) && !s.crouch;
       const boost = def.ability.id === 'adrenaline' && me.abilityActiveUntil > snap.time ? ADRENALINE_BOOST : 1;
       const speed = (s.crouch ? def.stats.crouch : sprinting ? def.stats.sprint : def.stats.walk) * boost;
       const sin = Math.sin(s.yaw);

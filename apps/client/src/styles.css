@@ -113,7 +113,6 @@ code { font-family: var(--mono); color: var(--amber); font-size: 0.9em; }
 .menu-foot { display: flex; gap: 28px; margin-top: 4vh; font-family: var(--mono); font-size: 11px; color: var(--grey); letter-spacing: 0.08em; }
 .rec { color: var(--crimson-hi); animation: blink 1.6s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.2; } }
-.touch-note { position: fixed; top: 0; left: 0; right: 0; z-index: 50; padding: 10px 16px; background: #2a0b09; font-size: 13px; text-align: center; }
 
 /* generic screens */
 .screen { z-index: 5; background: radial-gradient(ellipse at 20% 0%, #17110f 0%, var(--ink) 60%); display: flex; flex-direction: column; overflow: auto; }
@@ -458,3 +457,55 @@ body.cine .hud, body.cine .guide, body.cine .story-card, body.cine .toasts, body
 @keyframes cine-title { 0%, 15% { color: transparent; } 35%, 85% { color: #d9d2c2; } 100% { color: transparent; } }
 @keyframes cine-fade { 0% { filter: brightness(0); } 18% { filter: brightness(1.08) contrast(1.06); } 85% { filter: brightness(1) contrast(1.04); } 100% { filter: brightness(0.25); } }
 .sub-thought { font-style: italic; color: #cfd6dc; background: rgba(0, 0, 0, 0.45); }
+
+/* ───────────── phones and tablets ───────────── */
+html.touch, html.touch body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+.touch .game canvas { touch-action: none; }
+.touch .overlay { touch-action: pan-y; }
+.touch kbd, .touch .hud-status { display: none; }
+.touch-pad { position: absolute; inset: 0; z-index: 8; touch-action: none; }
+.touch-pad.journal-open { z-index: 21; }
+.stick { position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 1px solid rgba(239, 232, 216, 0.28); background: rgba(0, 0, 0, 0.28); pointer-events: none; }
+.stick.sprint { border-color: var(--crimson-hi); }
+.stick-knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(239, 232, 216, 0.3); }
+.stick-hint { position: absolute; left: max(28px, env(safe-area-inset-left)); bottom: 26px; width: 92px; height: 92px; border-radius: 50%; border: 1px dashed rgba(239, 232, 216, 0.22); display: flex; align-items: center; justify-content: center; font: 400 10px var(--mono); letter-spacing: 0.2em; text-transform: uppercase; color: var(--bone-dim); pointer-events: none; }
+.touch-top { position: absolute; top: max(64px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); display: flex; gap: 8px; }
+.touch-buttons { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: 18px; display: grid; grid-template-columns: repeat(3, 54px); gap: 9px; align-items: end; }
+.tbtn { width: 54px; height: 54px; border-radius: 50%; border: 1px solid rgba(239, 232, 216, 0.3); background: rgba(8, 8, 9, 0.55); color: var(--bone); font: 500 10px var(--mono); letter-spacing: 0.04em; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.tbtn:active { transform: scale(0.93); }
+.tbtn.on { background: rgba(239, 232, 216, 0.22); }
+.tbtn.use { grid-column: 3; grid-row: 1 / span 2; width: 72px; height: 72px; font-size: 12px; align-self: center; justify-self: end; }
+.tbtn.use.ready { border-color: var(--crimson-hi); box-shadow: 0 0 18px rgba(190, 40, 30, 0.55); }
+.tbtn.small { width: auto; height: 34px; border-radius: 17px; padding: 0 14px; }
+.rotate-note { display: none; }
+@media (orientation: portrait) {
+  .rotate-note { display: flex; position: fixed; inset: 0; z-index: 100; background: #050505; color: var(--bone); align-items: center; justify-content: center; text-align: center; padding: 30px; font: 400 22px var(--serif); }
+}
+/* phone-height landscape screens: smaller type so the view stays clear */
+@media (max-height: 500px) {
+  .hud-tl { max-width: 42vw; }
+  .hud-objective { font-size: 15px; }
+  .hud-hint { font-size: 11px; }
+  .story-card { left: 14px; top: 10px; transform: none; width: min(320px, 40vw); padding: 8px 12px 10px; }
+  .story-card h3 { font-size: 15px; margin: 2px 0 4px; }
+  .story-card p { font-size: 11px; line-height: 1.4; }
+  .story-next { font-size: 11px; margin-top: 6px; padding-top: 6px; }
+  /* the story card takes the objective's corner while it is up */
+  .hud:has(.story-card) .hud-tl { display: none; }
+  .subtitles { bottom: 30%; width: min(460px, 46vw); }
+  .subtitle { font-size: 13px; padding: 6px 12px; }
+  .prompt { top: 62%; font-size: 12px; }
+  /* menu: title on the left, a scrolling list on the right */
+  .menu-inner { flex-direction: row; align-items: center; gap: 5vw; padding: 14px max(22px, env(safe-area-inset-left)); }
+  .brand { flex: 0 0 42%; }
+  .brand-bengali { font-size: 16px; }
+  .brand-title { font-size: 46px; }
+  .brand-sub { font-size: 10px; letter-spacing: 0.45em; }
+  .brand-tag { font-size: 13px; margin-top: 10px; }
+  .menu-list { margin-top: 0; flex: 1; max-height: 100%; overflow-y: auto; }
+  .menu-item { padding: 6px 10px; }
+  .menu-label { font-size: 18px; }
+  .menu-foot { display: none; }
+  /* puzzles, journal and pause panels are taller than a phone: let them scroll, top edge reachable */
+  .overlay { overflow-y: auto; align-items: safe center; padding: 8px 0; }
+}
