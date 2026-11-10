@@ -299,3 +299,18 @@ describe('MatchSimulation — the Caller', () => {
     expect(sim.checkpointsUsed).toBe(1);
   });
 });
+
+describe('MatchSimulation — the night call', () => {
+  it('turning to the third call brings her, with a moment to run before she can take you', () => {
+    const sim = new MatchSimulation({ seed: 7, mode: 'solo' });
+    sim.addSurvivor('p', 'Aditi', 'aditi');
+    sim.tick(0.05);
+    sim.debugPlace('p', { x: 0, y: 0, z: 3.5 });
+    expect(sim.nishiTurned('p', { x: 0, y: 0, z: 1.5 })).toBe(true);
+    const g = sim.snapshot().ghost;
+    expect(g.mode).toBe('hunt');
+    expect(g.visible).toBe(true);
+    run(sim, 2);
+    expect(sim.snapshot().survivors[0].status).toBe('alive');
+  });
+});

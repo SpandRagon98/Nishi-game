@@ -992,6 +992,47 @@ class AudioEngine {
     }
   }
 
+  private clips = new Map<string, Promise<AudioBuffer | null>>();
+  private clip(url: string) {
+    let p = this.clips.get(url);
+    if (!p) {
+      p = fetch(url).then((r) => r.arrayBuffer()).then((b) => this.ctx!.decodeAudioData(b)).catch(() => null);
+      this.clips.set(url, p);
+    }
+    return p;
+  }
+
+  /**
+   * A recorded voice placed by hand rather than by the 3D panner, so it can sit in one ear: `pan`
+   * -1..1 (left..right), `far` 0..1 muffles it and pushes it into the hall's echo. Returns a handle
+   * that steers the pan as the listener turns, or null when there is no audio.
+   */
+  async voiceAt(url: string, pan: number, far: number, gain = 1) {
+    if (!this.ctx) return null;
+    const buf = await this.clip(url);
+    const ctx = this.ctx;
+    if (!buf || !ctx) return null;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.value = gain * (1 - 0.55 * far);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 9000 - 6800 * far;
+    const sp = ctx.createStereoPanner();
+    sp.pan.value = pan;
+    const send = ctx.createGain();
+    send.gain.value = 0.2 + 0.6 * far;
+    src.connect(g).connect(lp).connect(sp).connect(this.buses.dialogue);
+    lp.connect(send).connect(this.reverbIn);
+    src.start(ctx.currentTime + 0.02);
+    return {
+      duration: buf.duration,
+      setPan: (p: number) => sp.pan.setTargetAtTime(p, ctx.currentTime, 0.06),
+      ended: new Promise<void>((r) => (src.onended = () => r())),
+    };
+  }
+
   /** Continuous positional emitters (reel hiss, echo traps, ringing phone). */
   setLoop(key: string, kind: 'hiss' | 'footsteps' | 'phone', pos: Vec3 | null) {
     if (!this.ctx) return;

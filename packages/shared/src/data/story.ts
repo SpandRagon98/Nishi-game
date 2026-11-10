@@ -16,7 +16,7 @@ export const OBJECTIVES: { id: ObjectiveId; title: string; hint: string }[] = [
  * The spine of the chapter. A beat plays as a story card when it happens and is kept in the journal
  * under "The story so far". `next` tells the player exactly what to do afterwards.
  */
-export type StoryBeatId = 'arrival' | ObjectiveId | 'first_hunt' | 'reel_1' | 'reel_2' | 'reel_3' | 'phone';
+export type StoryBeatId = 'arrival' | ObjectiveId | 'first_hunt' | 'reel_1' | 'reel_2' | 'reel_3' | 'phone' | 'nishi';
 
 export const STORY_BEATS: Record<StoryBeatId, { title: string; text: string; next?: string }> = {
   arrival: {
@@ -73,6 +73,11 @@ export const STORY_BEATS: Record<StoryBeatId, { title: string; text: string; nex
   escape: {
     title: 'The street',
     text: 'Dawn over the tram lines. In your pocket the cassette is still turning. When you play it back at home there are two voices on it now: hers, and one that is learning yours.',
+  },
+  nishi: {
+    title: 'Nishir daak',
+    text: "Thakuma's rule, from the village: at night, never answer your name until it is called a third time. The Nishi can only call twice. But this one has Ma's voice now, and it has learned the third call. Whoever turns to it, it takes.",
+    next: "When she calls your name, don't turn towards the voice. Keep facing away until it is gone.",
   },
   first_hunt: {
     title: 'It is hunting',
@@ -187,6 +192,7 @@ export const ADITI_THOUGHTS: { ambient: string[]; after: Partial<Record<Objectiv
     "That's just the wind. It's just the wind.",
     'Keep moving. Kabir is right outside.',
     'Why does every clock here stop at three thirteen?',
+    "Thakuma said never answer a voice at night. Not until the third time.",
     'Somebody was sitting here. The dust is still warm.',
   ],
   after: {
@@ -197,6 +203,26 @@ export const ADITI_THOUGHTS: { ambient: string[]; after: Partial<Record<Objectiv
     decode: 'That was her voice. Ma...',
     exit: "Run. Don't look back.",
   },
+};
+
+/**
+ * Nishir daak, the night call (Bengali folklore): the Nishi calls a person's name in the voice of someone
+ * they love, and whoever answers, or turns to it, follows it into the dark. It can only call twice, so the
+ * old rule is never to answer until you hear your name a third time. This one learned the third call.
+ * `calls` are the Caller in Ma's voice, each slower and nearer; `replies` are Aditi under her breath.
+ */
+export const NISHI_CALL = {
+  calls: ['Aditi?', "Aditi... shona, it's me.", 'Aditi.'],
+  replies: ["Ma...? No. Ma isn't here.", 'Thakuma said it can only call twice. Only twice.'],
+  resisted: "I didn't turn. It was never her.",
+};
+
+/** Voices heard inside the cutscenes, after the task that plays them. */
+export const CUTSCENE_LINES: Partial<Record<ObjectiveId, { who: 'mother' | 'caller' | 'aditi'; text: string }[]>> = {
+  office: [{ who: 'mother', text: 'Three reels. Three numbers. Do not let it call a third time.' }],
+  reels: [{ who: 'mother', text: 'If you are hearing this, I kept it busy long enough. Now finish it, Aditi.' }],
+  decode: [{ who: 'mother', text: "Go. Now. Don't look back for me." }],
+  exit: [{ who: 'caller', text: 'Aditi.' }],
 };
 
 export const WHISPERS = [

@@ -7,7 +7,7 @@ import { audio, FORCE_MUTE } from './engine';
  * speech synthesis reads it. Subtitles always carry every line.
  */
 const CLIPS = import.meta.glob('../assets/voice/*.mp3', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-const clipUrl = (text: string) => CLIPS[`../assets/voice/${lineKey(text)}.mp3`];
+export const clipUrl = (text: string): string | undefined => CLIPS[`../assets/voice/${lineKey(text)}.mp3`];
 
 let voices: SpeechSynthesisVoice[] = [];
 function refreshVoices() {

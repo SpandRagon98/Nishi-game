@@ -12,7 +12,7 @@ import { fx, now } from '../game/fx';
 import { consumeMouse, isDown, matches, stick } from '../game/input';
 import { guide } from '../game/guidance';
 import { runtime } from '../game/runtime';
-import { applyCutscene, inCutscene } from '../game/cutscene';
+import { applyCutscene, cineFocus, inCutscene } from '../game/cutscene';
 import { mutter } from '../game/events';
 import type { GameSession } from '../game/session';
 import { findTarget, type Target } from '../game/targeting';
@@ -275,29 +275,34 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     const strong = usingFlash || !!cineDir;
     const threatened = gd < 10 && (g.mode === 'hunt' || g.mode === 'warn');
     s.torchK = THREE.MathUtils.damp(s.torchK, flashOn ? (threatened ? 0.35 : 1) : 0, flashOn ? 9 : 14, dt);
-    s.aim.lerp(tmpV.set(fwd.x, fwd.y, fwd.z), 1 - Math.exp(-16 * dt)).normalize();
-    spot.position.copy(camera.position).add(tmpV.set(0.2, -0.3, -0.45).applyQuaternion(camera.quaternion));
+    // (a scene's hard cuts take the beam with them, without a sweep)
+    s.aim.lerp(tmpV.set(fwd.x, fwd.y, fwd.z), cineDir ? 1 : 1 - Math.exp(-16 * dt)).normalize();
+    // in her hand during play; on a scene's camera it rides on the lens, so close shots are lit where they look
+    spot.position.copy(camera.position).add((cineDir ? tmpV.set(0.06, 0.05, 0) : tmpV.set(0.2, -0.3, -0.45)).applyQuaternion(camera.quaternion));
     // close to a wall a real torch floods a small bright disc: dim it so the screen never whites out
     if (flashOn) {
       ray.origin = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
       ray.dir = { x: s.aim.x, y: s.aim.y, z: s.aim.z };
       const hit = world.castRay(ray, 8, true, undefined, undefined, col, b);
       const d = hit ? hit.timeOfImpact : 8;
-      s.wallK = THREE.MathUtils.damp(s.wallK, THREE.MathUtils.clamp((d - 0.3) / 3.2, 0.25, 1), 6, dt);
+      // (a scene's close shots keep the same exposure at any distance: the light falls off as d^1.6)
+      const want = cineDir ? THREE.MathUtils.clamp(Math.pow(Math.min(d, cineFocus()) / 3.6, 1.6), 0.02, 1) : THREE.MathUtils.clamp((d - 0.3) / 3.2, 0.25, 1);
+      s.wallK = cineDir ? want : THREE.MathUtils.damp(s.wallK, want, 6, dt);
     }
     const k = s.torchK * s.wallK;
     // the flashlight throws a long, tight, bright beam; the phone a weak wide wash
     spot.intensity = (strong ? 42 : 9) * k;
     spot.distance = strong ? 34 : 12;
-    spot.angle = strong ? 0.34 : 0.68;
-    spot.penumbra = strong ? 0.42 : 0.9;
+    // on a scene's camera it is a soft key light rather than a hard disc
+    spot.angle = cineDir ? 0.5 : strong ? 0.34 : 0.68;
+    spot.penumbra = cineDir ? 0.85 : strong ? 0.42 : 0.9;
     spot.target.position.copy(spot.position).addScaledVector(s.aim, 6);
     spot.target.updateMatrixWorld();
     torch.on = s.torchK > 0.02;
     torch.strength = k * (strong ? 1 : 0.45);
     torch.pos.copy(spot.position);
     torch.dir.copy(s.aim);
-    torch.cos = Math.cos(strong ? 0.27 : 0.55);
+    torch.cos = Math.cos(cineDir ? 0.4 : strong ? 0.27 : 0.55);
     held.current = { on: flashOn, strong, intensity: s.torchK, moving, sprinting, hidden: !!hiding || !alive || !!cineDir };
 
     // breathing: slow and cold at rest, quicker when moving, ragged when hunted or spent

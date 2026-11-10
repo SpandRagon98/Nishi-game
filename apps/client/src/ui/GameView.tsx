@@ -318,6 +318,10 @@ function GhostHud() {
 
 // ───────────────────────────── overlays ─────────────────────────────
 
+/**
+ * The journal (hold Tab): one screen, never a scrollbar. Only the current objective shows its hint,
+ * the newest story beat is told in full and older ones by title, and the radio keeps its last lines.
+ */
 function Journal({ session }: { session: GameSession }) {
   const snap = useSnapshot(session, 300);
   const log = useApp((s) => s.radioLog);
@@ -325,6 +329,9 @@ function Journal({ session }: { session: GameSession }) {
   if (!snap) return null;
   const w = snap.world;
   const me = snap.survivors.find((s) => s.id === session.localId);
+  const current = OBJECTIVES.find((o) => !w.objectives[o.id])?.id;
+  const latest = story[story.length - 1];
+  const reels = (['reel_a', 'reel_b', 'reel_c'] as const).filter((r) => w.collected.includes(r));
   return (
     <div className="overlay journal">
       <div className="journal-inner">
@@ -332,13 +339,13 @@ function Journal({ session }: { session: GameSession }) {
           <h3>Objectives</h3>
           <ul className="objectives">
             {OBJECTIVES.map((o) => (
-              <li key={o.id} className={w.objectives[o.id] ? 'done' : ''}>
-                <span>{w.objectives[o.id] ? '✓' : '○'}</span>
+              <li key={o.id} className={w.objectives[o.id] ? 'done' : o.id === current ? 'now' : 'later'}>
+                <span>{w.objectives[o.id] ? '✓' : o.id === current ? '●' : '○'}</span>
                 <div>
                   {o.title}
-                  {!w.objectives[o.id] && <small>{o.hint}</small>}
-                  {o.id === 'office' && !w.objectives.office && <small>Logbook {w.office.logbook ? '✓' : '○'} · Desk drawer {w.office.drawer ? '✓' : '○'}</small>}
-                  {o.id === 'reels' && <small>{['reel_a', 'reel_b', 'reel_c'].filter((r) => w.collected.includes(r)).length}/3 recovered</small>}
+                  {o.id === current && <small>{o.hint}</small>}
+                  {o.id === current && o.id === 'office' && <small>Logbook {w.office.logbook ? '✓' : '○'} · Desk drawer {w.office.drawer ? '✓' : '○'}</small>}
+                  {o.id === 'reels' && !w.objectives.reels && <small>{reels.length}/3 recovered</small>}
                 </div>
               </li>
             ))}
@@ -347,18 +354,18 @@ function Journal({ session }: { session: GameSession }) {
         <section>
           <h3>Inventory</h3>
           <ul className="inv">
-            {me?.hasFlashlight && <li>Flashlight</li>}
+            {me?.hasFlashlight && <li>Ma's flashlight</li>}
             {w.inventory.includes('maintenance_key') && <li>Maintenance key</li>}
-            {(['reel_a', 'reel_b', 'reel_c'] as const).filter((r) => w.collected.includes(r)).map((r) => (
-              <li key={r}>Reel {r.slice(-1).toUpperCase()} — the voice counts <b>{w.reelDigits[r]}</b></li>
+            {reels.map((r) => (
+              <li key={r}>Reel {r.slice(-1).toUpperCase()}: the voice counts <b>{w.reelDigits[r]}</b></li>
             ))}
             {!me?.hasFlashlight && w.inventory.length === 0 && <li className="muted">Nothing yet.</li>}
           </ul>
           <h3>Notes</h3>
           <ul className="inv">
-            {w.fuse.clue && <li>Logbook fuse ratings: {w.fuse.clue.map((v, i) => `${FUSE_LABELS[i].toLowerCase()} ${v}A`).join(' · ')}</li>}
-            {w.decodeOrder && <li>Announcement: reel {w.decodeOrder.join(' → reel ')}{w.decodeCode && <> · console code <b>{w.decodeCode.split('').join(' ')}</b></>}</li>}
-            {w.notes.map((n) => <li key={n}>{DOCUMENTS[n]?.title}</li>)}
+            {w.fuse.clue && <li>Fuse ratings: {w.fuse.clue.map((v, i) => `${FUSE_LABELS[i].toLowerCase()} ${v}A`).join(' · ')}</li>}
+            {w.decodeOrder && <li>Announcement: reel {w.decodeOrder.join(' → ')}{w.decodeCode && <> · code <b>{w.decodeCode.split('').join(' ')}</b></>}</li>}
+            {w.notes.length > 0 && <li className="muted">Read: {w.notes.map((n) => DOCUMENTS[n]?.title.split(',')[0]).join(' · ')}</li>}
             {!w.fuse.clue && !w.decodeOrder && !w.notes.length && <li className="muted">No notes.</li>}
           </ul>
         </section>
@@ -366,15 +373,15 @@ function Journal({ session }: { session: GameSession }) {
           <h3>The story so far</h3>
           <div className="story-log">
             {story.length === 0 && <p className="muted">Nothing yet.</p>}
-            {story.map((id) => (
-              <p key={id}><b>{STORY_BEATS[id].title}.</b> {STORY_BEATS[id].text}</p>
-            ))}
+            {story.length > 1 && <p className="story-titles">{story.slice(0, -1).map((id) => STORY_BEATS[id].title).join(' · ')}</p>}
+            {latest && <p className="story-latest"><b>{STORY_BEATS[latest].title}.</b> {STORY_BEATS[latest].text}</p>}
           </div>
-          <h3>Radio log</h3>
+          <h3>Radio</h3>
           <div className="radio-log">
-            {log.slice(-10).map((l) => (
+            {log.slice(-3).map((l) => (
               <p key={l.id}><b>{l.speaker || '…'}</b> {l.text}</p>
             ))}
+            {log.length === 0 && <p className="muted">Silence.</p>}
           </div>
         </section>
       </div>

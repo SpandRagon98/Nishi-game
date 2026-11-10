@@ -127,10 +127,10 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
       const next = OBJECTIVES.find((x) => x.id !== e.id && !session.snapshot()?.world.objectives[x.id]);
       s.toast({ title: `✓ ${o.title}`, text: next && !story ? `Next: ${next.title}` : undefined, tone: 'good' }, 3500);
       if (!story) break;
-      // a short cutscene, Aditi's own words over it, then the story card
+      // a short scene (Aditi's own words are in it), then the story card
       const cut = snap && me ? playCutscene(e.id, me, PLATFORM_ZERO, snap) : 0;
       const thought = ADITI_THOUGHTS.after[e.id];
-      if (thought && me?.characterId === 'aditi') setTimeout(() => mutter(thought), cut ? 1300 : 600);
+      if (!cut && thought && me?.characterId === 'aditi') setTimeout(() => mutter(thought), 600);
       setTimeout(() => app().beat(e.id), cut * 1000);
       break;
     }

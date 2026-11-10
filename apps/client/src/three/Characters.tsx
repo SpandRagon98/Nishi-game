@@ -231,9 +231,14 @@ export function Apparitions() {
   const slots = useMemo(() => [0, 1, 2].map(() => ({ spectral: { opacity: 0, speed: 0, stunned: false } as GhostControl, shadow: shadowMaterial() })), []);
   const refs = useRef<{ spectral: THREE.Group | null; shadow: THREE.Group | null }[]>([0, 1, 2].map(() => ({ spectral: null, shadow: null })));
   const anims = useRef([0, 1, 2].map(() => ({ current: { speed: 0, crouch: false, down: false, phase: 0 } as AnimState })));
-  useFrame(() => {
+  useFrame((_, dt) => {
     const t = now();
     fx.apparitions = fx.apparitions.filter((a) => a.until > t);
+    for (const a of fx.apparitions) {
+      if (!a.vel) continue;
+      a.pos.x += a.vel.x * dt;
+      a.pos.z += a.vel.z * dt;
+    }
     const list = fx.apparitions.slice(-3);
     refs.current.forEach((r, i) => {
       const a = list[i];
@@ -250,8 +255,11 @@ export function Apparitions() {
           slots[i].shadow.uniforms.uTime.value = t;
           slots[i].shadow.uniforms.uOpacity.value = fade * 0.9;
         } else {
-          slots[i].spectral.opacity = fade * 0.85;
-          slots[i].spectral.scare = a.scare ? 1 : 0;
+          const sp = slots[i].spectral;
+          sp.opacity = fade * 0.9;
+          sp.scare = a.scare ? 1 : 0;
+          sp.still = !!a.still;
+          sp.speed = a.vel ? Math.min(1, Math.hypot(a.vel.x, a.vel.z) / 5) : 0;
         }
       }
     });

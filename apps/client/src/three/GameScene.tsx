@@ -24,6 +24,7 @@ import { PassageDetail } from './Passage';
 import { LightRig } from './Lights';
 import { SurvivorController } from './SurvivorController';
 import { inCutscene } from '../game/cutscene';
+import { updateNishi } from '../game/nishi';
 import { cachedTextures } from './textures';
 import { Horizon } from './Weather';
 import { DustMotes, MistBanks, Moon, useNightSky } from './Atmosphere';
@@ -179,6 +180,7 @@ export function GameCanvas({ session }: { session: GameSession }) {
         </Physics>
         {!ghost && <GhostActor />}
         {!ghost && <Watchers />}
+        {!ghost && <NishiDirector />}
         <Apparitions />
         <RemoteSurvivors localId={session.localId} ghostVision={ghost} />
         <GameLoop session={session} />
@@ -229,4 +231,10 @@ export function MenuCanvas() {
       </Suspense>
     </Canvas>
   );
+}
+
+/** the night call: Ma's voice calling Aditi's name, three times (game/nishi.ts) */
+function NishiDirector() {
+  useFrame(({ camera }) => updateNishi(camera));
+  return null;
 }

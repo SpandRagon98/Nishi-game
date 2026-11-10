@@ -2,6 +2,7 @@ import { CuboidCollider, RigidBody } from '@react-three/rapier';
 import type { BoxDef, LevelDef, MaterialId } from '@nishi/shared';
 import { useMemo } from 'react';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TEXTURE_SCALE, type TextureLibrary } from './textures';
 
 const METALNESS: Partial<Record<MaterialId, number>> = { rust: 0.35, metal: 0.6, corrugated: 0.45, carriage: 0.15 };
@@ -63,11 +64,11 @@ float wDamp = 0.0;`,
   diffuseColor.rgb = mix(diffuseColor.rgb * grime, diffuseColor.rgb * vec3(0.5, 0.42, 0.34), drip * 0.75);
   // damp patches on floors
   float floorK = smoothstep(0.7, 0.95, vWNrm.y);
-  wDamp = smoothstep(0.58, 0.7, wNoise(wp.xz * 0.3 + 11.0) * 0.75 + fine * 0.25) * floorK * uWet;
+  wDamp = smoothstep(0.52, 0.66, wNoise(wp.xz * 0.3 + 11.0) * 0.75 + fine * 0.25) * floorK * uWet;
   diffuseColor.rgb *= 1.0 - wDamp * 0.35;
 }`,
       )
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.14, wDamp);');
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.1, wDamp);');
   };
 }
 
@@ -192,10 +193,48 @@ export function buildLevelGeometry(level: LevelDef) {
 }
 
 /** Visual level geometry (merged: one draw call per material). */
+/**
+ * the platform's public-address horns, bolted to the canopy posts and angled down at the platform.
+ * Ma's voice comes out of these in the decode scene, which looks up at the one on the x = 12 post.
+ */
+export const PA_HORNS = [-28, -12, 4, 12, 28].map((x) => new THREE.Vector3(x, 4.1, 6.05));
+/** the same surface seen from the other side (for the inside of an open shape on a one-sided material) */
+function inside(g: THREE.BufferGeometry) {
+  const f = g.toNonIndexed();
+  for (const name of ['position', 'normal', 'uv'] as const) {
+    const a = f.getAttribute(name);
+    for (let i = 0; i < a.count; i += 3) for (let k = 0; k < a.itemSize; k++) {
+      const t = a.getComponent(i + 1, k);
+      a.setComponent(i + 1, k, a.getComponent(i + 2, k));
+      a.setComponent(i + 2, k, t);
+    }
+  }
+  const n = f.getAttribute('normal');
+  for (let i = 0; i < n.array.length; i++) (n.array as Float32Array)[i] *= -1;
+  return f;
+}
+
+function hornGeometry() {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const h of PA_HORNS) {
+    const tilt = new THREE.Matrix4().makeRotationX(-0.45);
+    const at = new THREE.Matrix4().makeTranslation(h.x, h.y, h.z);
+    // flared bell (mouth towards -z), the driver behind it, and the bracket into the post
+    const bell = new THREE.CylinderGeometry(0.05, 0.19, 0.46, 18, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.23);
+    const driver = new THREE.CylinderGeometry(0.075, 0.075, 0.14, 14).rotateX(Math.PI / 2).translate(0, 0, 0.05);
+    const arm = new THREE.BoxGeometry(0.05, 0.05, 0.3).translate(0, 0.02, 0.2);
+    for (const g of [bell, inside(bell.clone().scale(0.96, 0.96, 1)), driver]) parts.push(g.applyMatrix4(tilt).applyMatrix4(at));
+    parts.push(arm.applyMatrix4(at));
+  }
+  return mergeGeometries(parts.map((g) => g.index ? g.toNonIndexed() : g))!;
+}
+
 export function LevelMeshes({ level, materials, shadows }: { level: LevelDef; materials: Record<MaterialId, THREE.Material>; shadows: boolean }) {
   const parts = useMemo(() => buildLevelGeometry(level), [level]);
+  const horns = useMemo(hornGeometry, []);
   return (
     <group name="level">
+      <mesh geometry={horns} material={materials.rust} castShadow={shadows} />
       {parts.map((p) => (
         <mesh key={p.mat} geometry={p.geo} material={materials[p.mat]} receiveShadow={shadows} castShadow={shadows && p.mat !== 'ballast'} />
       ))}

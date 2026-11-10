@@ -78,8 +78,17 @@ Hold the phone sideways. The first tap goes fullscreen (and locks landscape on A
 - **Solo:** checkpoints at each objective, failure with Retry-from-checkpoint or Restart, and a victory screen.
 - **Story first:** new players start with **Begin the Story** (returning players get Continue / Replay the Prologue; skipping takes a second Esc). The loading screen recaps the story and tonight's goal, and in play every turning point arrives as a story card (her torch, the station master's log, each reel's voice, the first hunt, the escape) that ends with a clear *Next* step. The journal (Tab) keeps "The story so far".
 - **Guidance:** the HUD shows the current objective with a plain-language hint, and a marker at the top of the screen points along the walkable route to the next step with its distance (including "take the stairs up/down"). The fuse box shows the logbook ratings once read, and the console shows your reel numbers and the announced order, with a button to replay the announcement (using the console before you have every reel also replays it). It can be turned off in Settings.
-- **Cutscenes:** after each task a storyboarded 4–6 s sequence plays in 2.39:1 scope (black bars computed for a 21:9 picture on any screen, the beat's title in the lower bar): an insert on what she just did, a glide out of her eyes along the route, and a reveal of the next goal. Restoring power and opening the exit end on a jump-scare cut: the Caller right in front of the lens, head snapping, arms reaching. Solo play pauses during them.
-- **Aditi's voice:** she talks to herself now and then when nothing is near, and after each task. Kabir drove her to the station and talks to her over the radio from the car.
+- **Cutscenes:** after each task a storyboarded 8–14 s scene plays in 2.39:1 scope, cut like a film (inserts, handheld point-of-view, locked-off wides, long-lens push-ins, hard cuts). Each one is a beat of the story, with the Caller a little closer every time:
+  - *Her torch:* the red kit in the beam; she sweeps the platform and the beam finds someone standing in the mist; it swings back and nobody is there.
+  - *Ma's note:* the drawer slides open on Ma's handwriting ("Three reels. Three numbers. Do not let it call a third time."), read in her voice; the dead phone rings once; a shadow walks past the doorway behind her.
+  - *The last reel:* the reel where she found it, with Ma's voice from today on the tape; every light near her dies and something crosses behind her.
+  - *Power:* the fuses; the platform waking a light at a time; a long lens on the Caller waiting under the last tube, the tube dying, then a hard cut on the same lens with her right in front of it.
+  - *Ma on the speakers:* the console takes the code, the station goes silent, and Ma's voice comes out of the platform horns.
+  - *The run:* Kabir's headlights through the open doors; behind her, at the far end of the hall, the Caller says "Aditi." in Ma's voice and runs.
+
+  The torch rides on the lens as the key light (exposure follows the subject's distance, so close-ups never blow out), item markers hide, and solo play pauses.
+- **Nishir daak, the night call:** Bengali folklore says the Nishi calls your name at night in the voice of someone you love, and can only call twice, so you answer only the third call. This one has learned the third call. After Ma's note, in a quiet moment, Ma's voice calls "Aditi?" far off in one ear, then nearer and behind, then softly right behind her shoulder. Aditi half-believes it is her mother and talks herself out of it under her breath. Keep facing away and it passes; turn towards the third call and the Caller is standing there, and the hunt starts with a moment to run. It happens up to three times a night.
+- **Voices:** Aditi talks to herself now and then when nothing is near, and after each task. Kabir talks to her over the radio from the car. Ma speaks from the cassette, the reels, her note, the phone and the station speakers. The Caller speaks only with Ma's voice. See *Voices* below for how they are recorded.
 - **Interactive prologue:** a tape deck with a branching choice.
 - **AI ghost:** roams, stalks and hunts; sees flashlights, hears sprinting; can be broken off by hiding or losing line of sight; stunned by flashlights.
 - **Adaptive horror director:** nine handcrafted events chosen by threat, progress, isolation, cooldowns and priority, from a seeded RNG.
@@ -95,11 +104,11 @@ Hold the phone sideways. The first tap goes fullscreen (and locks landscape on A
 Everything is **procedural**, and no external assets are bundled:
 - **Materials:** canvas-painted PBR sets (albedo, roughness and normal) with world-space UVs, broken up by a world-space weathering layer (grime blotches, rust drip streaks down walls, glossy damp patches on floors) so no two metres look alike, such as wet platform tiles, two-tone railway plaster, terrazzo, rust, brick, ballast, corrugated sheet, coach paint and glazed tiles.
 - **Atmosphere:** no rain. Height-weighted mist is densest near the ground and in the passage, with drifting fog banks, a moon, moonlight shafts through a broken roof, and dust visible only inside torch beams. A night-sky environment map gives the wet floor its reflections.
-- **Station:** a Howrah-style arched cast-iron train shed, a brick arcade with iron grilles, sodium wall lanterns, cast-iron benches, a coin weighing machine, a shrine with dried marigolds and a diya, dead indicator boards, Bengali graffiti, abandoned belongings and weeds in the ballast.
+- **Station:** a Howrah-style arched cast-iron train shed, public-address horns on the canopy posts, a brick arcade with iron grilles, sodium wall lanterns, cast-iron benches, a coin weighing machine, a shrine with dried marigolds and a diya, dead indicator boards, Bengali graffiti, abandoned belongings and weeds in the ballast.
 - **Train:** a three-coach Kolkata suburban EMU rake with livery, barred windows, open doorways, bogies, roof ventilators, a raised pantograph and a cab with a working headlight. The last coach disappears into the tunnel. The walk-through coach has its own dim battery-fed saloon tubes.
-- **Rendering:** pooled real lights that crossfade between fixtures, plus emissive fixtures and fake volumetric cones. Nothing strobes: power cuts, brown-outs and the Caller's drain all fade. Post-processing adds bloom on bright practicals only, a cold grade, darkening grain, a vignette and SMAA anti-aliasing; SSAO only on High.
+- **Rendering:** pooled real lights that crossfade between fixtures, plus emissive fixtures and fake volumetric cones. Nothing strobes: power cuts, brown-outs and the Caller's drain all fade. Post-processing adds bloom on bright practicals only, a filmic grade (cool shadows, warm practicals, a sickly green in the mids), darkening grain, a vignette and SMAA anti-aliasing; SSAO only on High.
 - **Underground passage:** deliberately lopsided: service pipes, a sagging cable and a cable tray along one wall only, a peeling green dado and torn notices on the other, tiles fallen off in patches, rubble and a dead light fitting hanging over the walkway.
-- **Characters:** primitive-built humanoids. The Caller is a procedural woman in a torn, grimy white saree with the pallu over her shoulders, long wet black hair parted over a gaunt grey face (sunken eye sockets, hollow cheeks), thin tapered arms with old bangles and glowing white eyes. The saree hangs in uneven folds and its hem thins into the mist. Her hem and hair drift on their own and she hovers rather than walks. The figures watching from the mist use a glitching shadow shader. In first person only the top of Aditi's phone shows at the bottom of the view; its torch trails your aim slightly and dims near walls so it never whites out the screen. Picking up the emergency flashlight equips it (a long, tight, brighter beam that lights the mist it passes through); X swaps back to the phone. Up close during a hunt the Caller lunges, head twitching and snapping, arms reaching for you.
+- **Characters:** primitive-built humanoids. The Caller is a procedural, skinned woman: one 26-bone skeleton drives a single body with a sculpted face, a jaw that drops open to scream, two-jointed fingers and sloped shoulders. She wears a torn, grimy white saree with the pallu over her shoulders. Her long wet black hair hangs with gravity as her head moves, and she has grey mottled skin with veins, old bangles and glowing white eyes. She walks with a limp (one leg shorter and stiffer), hunched, her head twitching and snapping. Up close she lunges with her arms reaching and her mouth wide, and when the beam burns her she covers her face. The figures watching from the mist use a glitching shadow shader. In first person only the top of Aditi's phone shows at the bottom of the view; its torch trails your aim slightly and dims near walls so it never whites out the screen. Picking up the emergency flashlight equips it (a long, tight, brighter beam that lights the mist it passes through); X swaps back to the phone. Up close during a hunt the Caller lunges, head twitching and snapping, arms reaching for you.
 - **Exit:** a pair of riveted steel doors with wired glass and a status lamp (red, amber while the motor runs, green when open) swing out into the exit corridor over the motor's 6 s. Beyond them the street shutter is jammed half up and Kabir's car waits outside, headlights pouring under it through the mist. Lamp cones, roof moon shafts and the headlights carry slowly drifting mist.
 - **Prologue:** a 3D desk scene with a 1990s two-in-one radio-cassette player and a handwritten cassette, shot with depth of field.
 - **Audio:** all synthesised with Web Audio, through a station-sized convolution reverb and a master limiter.
@@ -107,9 +116,31 @@ Everything is **procedural**, and no external assets are bundled:
   - Menu ambience: wind through the shed, distant Kolkata traffic and horns, crickets, drips, a far-off train horn and dogs howling.
   - Voices: formant-synthesised screams (woman, man, through a telephone), the Caller's ring-modulated shriek, and moans.
   - Score: a detuned tanpura (Karplus-Strong), dissonant strings, trembling high strings, and dhol/tasha chase percussion with a Shepard tone during hunts.
-  - Spoken lines play a recorded voice clip when `apps/client/src/assets/voice/<key>.mp3` exists for that exact text, otherwise the browser's speech voice reads them; subtitles carry every line. `npx tsx scripts/voice-lines.ts --missing` lists the lines still to record, with the role and ElevenLabs voice for each.
+  - Spoken lines play a recorded voice clip when `apps/client/src/assets/voice/<key>.mp3` exists for that exact text; otherwise the browser's speech voice reads them. Subtitles carry every line. The night call places Ma's voice in the world (one ear, far off, then behind her) and keeps panning it as she turns.
 
-The atmosphere and lighting are a big step up, but this is still **not AAA-asset fidelity**. Modelled glTF assets and recorded voice acting are the next quality jump (see *Next steps*).
+The atmosphere and lighting are a big step up, but this is still **not AAA-asset fidelity**. Modelled glTF assets are the next quality jump (see *Next steps*).
+
+### Voices
+The spoken lines are generated locally with [OmniVoice](https://huggingface.co/k2-fsa/OmniVoice), the engine behind [VoiceStudio](https://github.com/debpalash/voicestudio), on the CPU. Nothing is played aloud while generating.
+- **The cast** (`CAST` in `scripts/voices/generate.py`):
+  - Aditi: a young woman, Indian English, frightened and holding herself together, with a whispered variant for her thoughts.
+  - Ma: middle-aged, low and warm, tired and urgent, with a whispered variant.
+  - Kabir: a young man, low, steady for her sake.
+  - The station announcer, and the old voice on the tape.
+
+  Each voice is designed from attributes, and a reference take is recorded in that character's mood. Every line is cloned from it, so a character keeps one voice all the way through.
+- **Where a line is heard** shapes it:
+  - Kabir's radio is band-limited and saturated.
+  - The cassette and reels have hiss and a small room.
+  - The station speakers echo down the platform.
+  - The Caller's last call is Ma's voice slowed, lowered and doubled with a whisper.
+- **Every take is checked without listening.** It is transcribed with Whisper and its pitch is measured. A take that doesn't say its line in the character's register (the model sometimes returns noise) is redone with another seed and punctuation. The scores go to `scripts/voices/report.json`.
+
+Setup (once): create a Python 3.11+ venv with `pip install omnivoice librosa soundfile transformers`, then download `k2-fsa/OmniVoice` and `openai/whisper-base.en` (or let them download on the first run). Then:
+```
+OMNIVOICE_MODEL=<model folder> WHISPER_MODEL=<whisper folder> python scripts/voices/generate.py
+```
+It records only lines without a clip. `--all` redoes every line, and `--refs` redoes the reference takes. `npx tsx scripts/voice-lines.ts --missing` lists what is left.
 
 ### Not done yet (honest list)
 - Chapters 2–8, and survivors Meera, Tenzin and Farah. They are registered as data and shown as locked or upcoming.
@@ -166,7 +197,7 @@ There are two modes, and they never mix:
 - **Testing mode** is the dev server (`npm run studio`, or http://localhost:5173/?studio, or *Testing Studio* in the dev menu). It drops you straight into the station with the **Testing Studio** panel open (press <kbd>`</kbd> to hide or show it; the game doesn't pause while it's open):
   - **Steps:** jump to the start of any of the seven steps. Every earlier step is done for you (flashlight, key, reels, power, code, doors) and you stand next to where that step happens.
   - **Story:** play any task cutscene, show any story card, or play the cassette prologue.
-  - **Ghost:** pin the Caller in front of you and pose her (lunge and reach, hair speed, turn, stunned), fire a jump scare, start or end a hunt, *Calm* (she never hunts) and *God mode* (she can't take you).
+  - **Ghost:** pin the Caller in front of you and pose her (lunge and reach, hair speed, turn, stunned), fire a jump scare, start the night call (keep facing away, or turn to the third call), start or end a hunt, *Calm* (she never hunts) and *God mode* (she can't take you).
   - **World:** free camera (WASD + mouse, Shift fast, Space up, C down: click the view to steer), freeze the world, teleport to any room or object.
   - **Look:** graphics tier, FPS meter, hide the HUD for clean views.
   - **Notes:** write what should change. Each note is saved with where you were, what you were looking at and a screenshot in `studio-notes/` (git-ignored). Then ask Claude to "apply my studio notes".
@@ -207,7 +238,7 @@ The renderer is built to hold 40–60 fps on ordinary laptops, and its tiers are
 
 ## Next steps
 1. Replace blockout props and characters with modelled, appropriately licensed glTF assets. Use KTX2 textures and add baked lightmaps.
-2. Record or license real voice acting and screams. The synthesised voices are convincing, but not human.
+2. Replace the synthesised screams and breathing with recorded ones, and have a person listen through the generated voice lines.
 3. Add a rebinding UI and gamepad support.
 4. Filter state per client (`StateView`) so the ghost cannot read hidden survivors, and add server-side rate limits per action.
 5. Add Supabase-backed profiles through `ProfileRepository`.

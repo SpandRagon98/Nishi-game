@@ -124,6 +124,8 @@ function Ghost({ refresh }: { refresh: () => void }) {
       )}
       <h4>Scares</h4>
       <button className="studio-row" onClick={A.jumpScare}>Jump scare, right now</button>
+      <button className="studio-row" onClick={A.nishiCall}>Nishi call: Ma's voice calls three times</button>
+      <p className="studio-help">Keep facing away until it passes. Turn towards the third call and she is there.</p>
       <h4>AI</h4>
       <p className="studio-help">Caller: <b>{runtime.snap?.ghost.mode ?? '-'}</b></p>
       <button className="studio-row" onClick={() => A.ghost('hunt')}>Start a hunt</button>

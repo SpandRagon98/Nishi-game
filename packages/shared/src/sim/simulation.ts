@@ -619,6 +619,30 @@ export class MatchSimulation {
     g.huntUntil = g.warnUntil = 0;
   }
 
+  /**
+   * Nishir daak: whoever turns to the third call is taken for. The Caller is standing where the voice
+   * was, already hunting, and she is on you. Returns false when she can't come (a player Caller, calm).
+   */
+  nishiTurned(playerId: string, at: Vec3) {
+    const g = this.ghost;
+    const s = this.survivors.get(playerId);
+    if (!s || g.controllerId || this.debug.calm || g.mode === 'stunned') return false;
+    g.pos = copyV(at);
+    g.path = [];
+    g.yaw = Math.atan2(-(s.pos.x - at.x), -(s.pos.z - at.z));
+    if (g.mode !== 'hunt') g.huntId++;
+    g.mode = 'hunt';
+    g.visible = true;
+    g.huntUntil = this.time + Math.max(16, this.aiHuntDuration());
+    g.targetId = playerId;
+    g.lastKnown = copyV(s.pos);
+    g.lastSeenAt = this.time;
+    // the lunge is the scare, not the end: a moment to run, hide or burn her with the beam
+    g.captureReadyAt = this.time + 2.4;
+    this.emit({ type: 'hunt', phase: 'start' });
+    return true;
+  }
+
   private saveCheckpoint(id: ObjectiveId) {
     this.checkpoint = {
       key: id === 'exit' ? 'exit' : id,
@@ -1120,7 +1144,7 @@ export class MatchSimulation {
       this.followPath(speed * 0.75, dt);
     }
 
-    const victim = this.capturable(1.25);
+    const victim = g.captureReadyAt <= this.time ? this.capturable(1.25) : null;
     if (victim) this.captureSurvivor(victim);
   }
 

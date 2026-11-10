@@ -4,7 +4,8 @@ import type { DoorDef, InteractableDef, LevelDef, MaterialId, Vec3 } from '@nish
 import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { audio } from '../audio/engine';
-import { now } from '../game/fx';
+import { inCutscene } from '../game/cutscene';
+import { fx, now } from '../game/fx';
 import { runtime } from '../game/runtime';
 import { coneMaterial, shaftTime } from './Lights';
 
@@ -258,17 +259,47 @@ function Glint({ seed }: { seed: number }) {
     const t = now();
     // a steady warm glow you can spot across a dark room, plus a slow catch-light pulse
     const s = Math.max(0, Math.sin(t * 1.6 + seed)) ** 6;
-    m.opacity = 0.4 + s * 0.55;
+    // (a scene shows the thing itself, not the game's marker on it)
+    m.opacity = inCutscene() ? 0 : 0.4 + s * 0.55;
     ref.current?.scale.setScalar(0.2 + s * 0.16);
   });
   return <sprite ref={ref} material={m} position={[0, 0.08, 0]} />;
+}
+
+/** Ma's note, folded open in the drawer: her handwriting, read close in the office scene */
+let noteTex: THREE.CanvasTexture | null = null;
+function maNote() {
+  if (noteTex) return noteTex;
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 320;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#d9cfb4';
+  x.fillRect(0, 0, 256, 320);
+  // a crease, foxing, faint ruled lines
+  x.fillStyle = 'rgba(90,70,40,0.12)';
+  x.fillRect(0, 158, 256, 3);
+  for (let i = 0; i < 26; i++) {
+    x.beginPath();
+    x.arc((i * 97) % 256, (i * 61) % 320, 3 + (i % 5) * 3, 0, 7);
+    x.fill();
+  }
+  x.strokeStyle = 'rgba(70,90,130,0.18)';
+  for (let y = 54; y < 310; y += 26) x.strokeRect(14, y, 228, 0.5);
+  x.fillStyle = '#1d2236';
+  x.font = 'italic 22px "Segoe Script", "Bradley Hand", cursive';
+  ['Aditi,', 'Three reels.', 'Three numbers.', 'Do not let it', 'call a third', 'time.', '', '        - Ma'].forEach((l, i) => x.fillText(l, 20 + (i % 2) * 4, 46 + i * 26));
+  noteTex = new THREE.CanvasTexture(c);
+  noteTex.colorSpace = THREE.SRGBColorSpace;
+  noteTex.anisotropy = 4;
+  return noteTex;
 }
 
 const FUSE_COLORS: Record<number, string> = { 5: '#c8b27a', 10: '#a8322a', 15: '#2d5aa8', 20: '#d6b52a', 30: '#3a8a46' };
 
 function Item({ def }: { def: InteractableDef }) {
   const group = useRef<THREE.Group>(null);
-  const drawer = useRef<THREE.Mesh>(null);
+  const drawer = useRef<THREE.Group>(null);
   const fuses = useRef<(THREE.Mesh | null)[]>([]);
   const lamp = useRef<THREE.MeshStandardMaterial>(null);
   const pos = useRef<Vec3 | null>(def.pos ?? null);
@@ -282,7 +313,7 @@ function Item({ def }: { def: InteractableDef }) {
       group.current.position.set(p.x, p.y, p.z);
     }
     const taken = def.kind === 'reel' && w.collected.includes(def.id);
-    group.current.visible = !taken;
+    group.current.visible = !taken || (fx.sceneReel === def.id && inCutscene());
     if (def.kind === 'reel') audio.setLoop(def.id, 'hiss', taken || !p ? null : p);
     if (drawer.current) drawer.current.position.z = w.office.drawer ? 0.3 : 0;
     if (def.kind === 'fuse_box') {
@@ -353,10 +384,31 @@ function Item({ def }: { def: InteractableDef }) {
         </>
       )}
       {def.kind === 'drawer' && (
-        <mesh ref={drawer}>
-          <boxGeometry args={[0.6, 0.18, 0.05]} />
-          <meshStandardMaterial color="#4a2b18" roughness={0.7} />
-        </mesh>
+        // the face, and behind it the tray (inside the desk until it slides out) with Ma's note in it
+        <group ref={drawer}>
+          <mesh>
+            <boxGeometry args={[0.6, 0.18, 0.05]} />
+            <meshStandardMaterial color="#4a2b18" roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0.03, 0.03]}>
+            <boxGeometry args={[0.12, 0.025, 0.02]} />
+            <meshStandardMaterial color="#8a7a5a" roughness={0.4} metalness={0.6} />
+          </mesh>
+          <mesh position={[0, -0.075, -0.22]}>
+            <boxGeometry args={[0.54, 0.015, 0.4]} />
+            <meshStandardMaterial color="#3a2214" roughness={0.85} />
+          </mesh>
+          {[-0.265, 0.265].map((sx) => (
+            <mesh key={sx} position={[sx, -0.025, -0.22]}>
+              <boxGeometry args={[0.012, 0.1, 0.4]} />
+              <meshStandardMaterial color="#3a2214" roughness={0.85} />
+            </mesh>
+          ))}
+          <mesh position={[0.02, -0.066, -0.2]} rotation={[-Math.PI / 2, 0, 0.12]}>
+            <planeGeometry args={[0.16, 0.2]} />
+            <meshStandardMaterial map={maNote()} roughness={0.9} />
+          </mesh>
+        </group>
       )}
       {def.kind === 'phone' && (
         <group rotation={[0, -0.5, 0]}>

@@ -7,6 +7,10 @@ import { runtime } from '../game/runtime';
 import { MOON_DIR } from './Atmosphere';
 import { StaticBatch } from './StaticBatch';
 
+/*
+ * Fixtures fall off a little slower than the inverse square (decay 1.7): a tube throws a long pool down
+ * the tiles and along the walls, as fluorescent light does in a corridor, instead of a small disc.
+ */
 /** current brightness factor (0..1+) of every level light, shared with other scene parts */
 export const lightLevels = new Map<string, number>();
 
@@ -110,9 +114,9 @@ function Fixture({ def, shafts }: { def: LightDef; shafts: boolean }) {
   useFrame(() => {
     shaftTime.value = now();
     const lv = lightLevels.get(def.id) ?? 0;
-    tubeMat.emissiveIntensity = lv * (def.kind === 'lamp' ? 6 : def.kind === 'lantern' ? 8 : 3.2);
+    tubeMat.emissiveIntensity = lv * (def.kind === 'lamp' ? 6 : def.kind === 'lantern' ? 8 : 4.6);
     cone.uniforms.uOpacity.value = lv * (def.kind === 'tube' ? 0.07 : 0.05);
-    haloMat.opacity = Math.min(1, lv) * (def.kind === 'lamp' ? 0.35 : def.kind === 'sign' ? 0.18 : 0.28);
+    haloMat.opacity = Math.min(1, lv) * (def.kind === 'lamp' ? 0.35 : def.kind === 'sign' ? 0.18 : 0.34);
     (cone.uniforms.uColor.value as THREE.Color).set(def.color);
   });
   return (
@@ -258,7 +262,7 @@ export function LightRig({ level, pool, shafts = true }: { level: LevelDef; pool
       {Array.from({ length: pool }, (_, i) => (
         <pointLight key={i} ref={(el) => {
             refs.current[i] = el;
-          }} decay={2} intensity={0} />
+          }} decay={1.7} intensity={0} />
       ))}
       <StaticBatch>
         {level.lights.map((l) => (

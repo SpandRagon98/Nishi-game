@@ -4,6 +4,7 @@ import {
 import { playCutscene } from '../game/cutscene';
 import { addApparition, fx } from '../game/fx';
 import { objectiveStep } from '../game/guidance';
+import { startNishi } from '../game/nishi';
 import { runtime } from '../game/runtime';
 import { LocalSession } from '../game/session';
 import { app } from '../state/store';
@@ -82,6 +83,11 @@ export function showGhost(on: boolean) {
   const e = runtime.eye;
   runtime.debugCaller = { ...snap.ghost, pos: p, yaw: Math.atan2(-(e.x - p.x), -(e.z - p.z)), mode: 'hunt', visible: true };
   runtime.studio.ghost ??= { scare: 0, speed: 0, stunned: false, spin: 0 };
+}
+
+/** the night call now, wherever you are: three calls in Ma's voice; turn to the third and she is there */
+export function nishiCall() {
+  if (!startNishi()) app().toast({ title: 'Start a story run first', tone: 'warn' }, 2000);
 }
 
 export function jumpScare() {
