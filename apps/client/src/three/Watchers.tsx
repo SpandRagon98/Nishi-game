@@ -6,15 +6,14 @@ import { audio } from '../audio/engine';
 import { now } from '../game/fx';
 import { runtime } from '../game/runtime';
 import { torch } from './Atmosphere';
-import { Humanoid, shadowMaterial, type AnimState } from './Characters';
+import { CallerFigure, type GhostControl } from './Ghost';
 
 /**
- * Figures standing in the mist, always at the edge of the torchlight. Purely visual and private to
- * each survivor: they fade in far away, face you, and are gone the moment you get close or put a
- * beam on them.
+ * The Caller, standing in the mist, always at the edge of the torchlight: barely there, dead still,
+ * facing you. Purely visual and private to each survivor: she fades in far away and is gone the moment
+ * you get close or put a beam on her.
  */
 const SPOTS = PLATFORM_ZERO.waypoints.map((w) => w.pos).filter((p) => p.y > -1.5);
-const PALETTE = { coat: '#000', accent: '#000', trousers: '#000', skin: '#000', hair: '#000' };
 
 interface Slot {
   pos: THREE.Vector3;
@@ -25,9 +24,8 @@ interface Slot {
 }
 
 export function Watchers({ count = 2 }: { count?: number }) {
-  const mats = useMemo(() => Array.from({ length: count }, () => shadowMaterial()), [count]);
+  const controls = useMemo(() => Array.from({ length: count }, () => ({ opacity: 0, speed: 0, stunned: false, still: true }) as GhostControl), [count]);
   const groups = useRef<(THREE.Group | null)[]>([]);
-  const anims = useRef(Array.from({ length: count }, () => ({ current: { speed: 0, crouch: false, down: false, phase: 0 } as AnimState })));
   const slots = useRef<Slot[]>(Array.from({ length: count }, (_, i) => ({ pos: new THREE.Vector3(), alpha: 0, state: 'hidden', until: 0, next: 12 + i * 17 })));
 
   useFrame((_, dt) => {
@@ -72,18 +70,17 @@ export function Watchers({ count = 2 }: { count?: number }) {
       g.visible = s.alpha > 0.01;
       g.position.copy(s.pos);
       g.rotation.y = Math.atan2(e.x - s.pos.x, e.z - s.pos.z);
-      mats[i].uniforms.uTime.value = t;
-      mats[i].uniforms.uOpacity.value = s.alpha * 0.85;
+      controls[i].opacity = s.alpha * 0.4;
     });
   });
 
   return (
     <>
-      {mats.map((m, i) => (
+      {controls.map((c, i) => (
         <group key={i} visible={false} userData={{ warm: true }} ref={(el) => {
           groups.current[i] = el;
         }}>
-          <Humanoid palette={PALETTE} anim={anims.current[i]} spectral={m} height={0.98} />
+          <CallerFigure control={{ current: c }} />
         </group>
       ))}
     </>

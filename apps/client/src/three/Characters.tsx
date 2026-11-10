@@ -177,14 +177,6 @@ export function spectralMaterial(glow = '#9fb8c8', base = '#06080a') {
   });
 }
 
-export function shadowMaterial() {
-  const m = spectralMaterial('#1a1d22', '#000000');
-  m.uniforms.uOpacity.value = 0.95;
-  return m;
-}
-
-const CALLER_PALETTE = { coat: '#000', accent: '#000', trousers: '#000', skin: '#000', hair: '#000' };
-
 /** The hunting / stunned Caller as seen by survivors. */
 export function GhostActor() {
   const group = useRef<THREE.Group>(null);
@@ -226,11 +218,13 @@ export function GhostActor() {
   );
 }
 
-/** Director apparitions / shadows and ghost-player apparitions (render-only). Three pooled slots. */
+/**
+ * Director apparitions / shadows and ghost-player apparitions (render-only). Three pooled slots, each
+ * the Caller herself, faint: a shape in the mist or crossing a doorway. Only a scare comes at you solid.
+ */
 export function Apparitions() {
-  const slots = useMemo(() => [0, 1, 2].map(() => ({ spectral: { opacity: 0, speed: 0, stunned: false } as GhostControl, shadow: shadowMaterial() })), []);
-  const refs = useRef<{ spectral: THREE.Group | null; shadow: THREE.Group | null }[]>([0, 1, 2].map(() => ({ spectral: null, shadow: null })));
-  const anims = useRef([0, 1, 2].map(() => ({ current: { speed: 0, crouch: false, down: false, phase: 0 } as AnimState })));
+  const slots = useMemo(() => [0, 1, 2].map(() => ({ opacity: 0, speed: 0, stunned: false }) as GhostControl), []);
+  const refs = useRef<(THREE.Group | null)[]>([]);
   useFrame((_, dt) => {
     const t = now();
     fx.apparitions = fx.apparitions.filter((a) => a.until > t);
@@ -240,45 +234,30 @@ export function Apparitions() {
       a.pos.z += a.vel.z * dt;
     }
     const list = fx.apparitions.slice(-3);
-    refs.current.forEach((r, i) => {
+    refs.current.forEach((g, i) => {
       const a = list[i];
-      for (const kind of ['spectral', 'shadow'] as const) {
-        const g = r[kind];
-        if (!g) continue;
-        const on = !!a && (a.kind === 'shadow') === (kind === 'shadow');
-        g.visible = on;
-        if (!on) continue;
-        g.position.set(a.pos.x, a.pos.y, a.pos.z);
-        g.rotation.y = a.yaw + Math.PI;
-        const fade = Math.min(1, (a.until - t) * 2);
-        if (kind === 'shadow') {
-          slots[i].shadow.uniforms.uTime.value = t;
-          slots[i].shadow.uniforms.uOpacity.value = fade * 0.9;
-        } else {
-          const sp = slots[i].spectral;
-          sp.opacity = fade * 0.9;
-          sp.scare = a.scare ? 1 : 0;
-          sp.still = !!a.still;
-          sp.speed = a.vel ? Math.min(1, Math.hypot(a.vel.x, a.vel.z) / 5) : 0;
-        }
-      }
+      if (!g) return;
+      g.visible = !!a;
+      if (!a) return;
+      g.position.set(a.pos.x, a.pos.y, a.pos.z);
+      g.rotation.y = a.yaw + Math.PI;
+      const fade = Math.min(1, (a.until - t) * 2);
+      const c = slots[i];
+      c.opacity = fade * (a.scare ? 0.9 : a.kind === 'shadow' ? 0.32 : 0.5);
+      c.scare = a.scare ? 1 : 0;
+      c.still = !!a.still;
+      c.speed = a.vel ? Math.min(1, Math.hypot(a.vel.x, a.vel.z) / 5) : 0;
     });
   });
   return (
     <>
-      {slots.map((m, i) =>
-        (['spectral', 'shadow'] as const).map((kind) => (
-          <group key={`${i}${kind}`} visible={false} userData={{ warm: true }} ref={(el) => {
-            refs.current[i][kind] = el;
-          }}>
-            {kind === 'shadow' ? (
-              <Humanoid palette={CALLER_PALETTE} anim={anims.current[i]} spectral={m.shadow} height={1.05} />
-            ) : (
-              <CallerFigure control={{ current: m.spectral }} />
-            )}
-          </group>
-        )),
-      )}
+      {slots.map((c, i) => (
+        <group key={i} visible={false} userData={{ warm: true }} ref={(el) => {
+          refs.current[i] = el;
+        }}>
+          <CallerFigure control={{ current: c }} />
+        </group>
+      ))}
     </>
   );
 }
