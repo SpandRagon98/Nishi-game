@@ -34,6 +34,8 @@ export interface HudState {
   exhausted: boolean;
   flashlight: boolean;
   hasFlashlight: boolean;
+  /** the flashlight is in hand rather than the phone */
+  usingFlashlight: boolean;
   abilityName: string;
   abilityLeft: number;
   abilityCooldown: number;
@@ -61,7 +63,7 @@ export interface HudState {
 }
 
 const EMPTY_HUD: HudState = {
-  prompt: null, zone: '', clock: '03:13', stamina: 1, exhausted: false, flashlight: false, hasFlashlight: false,
+  prompt: null, zone: '', clock: '03:13', stamina: 1, exhausted: false, flashlight: false, hasFlashlight: false, usingFlashlight: false,
   abilityName: '', abilityLeft: 0, abilityCooldown: 1, abilityActive: false, hiding: false, status: 'alive', bleedout: 0,
   reviveProgress: 0, signal: 0, objective: 'flashlight', echo: [], teammates: [], ghost: null, downedNearby: null, guide: null,
 };

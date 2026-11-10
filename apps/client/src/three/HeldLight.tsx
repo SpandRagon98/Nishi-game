@@ -55,7 +55,8 @@ function screenTexture() {
 
 /**
  * Aditi's phone, held low at the bottom-right of the view: only its top edge and a sliver of the dim
- * lock screen show. It sways with a soft lag so the torch light feels hand-held.
+ * lock screen show. Once she switches to the flashlight, the phone dips out of view and the torch comes
+ * up in its place. Both sway with a soft lag so the light feels hand-held.
  */
 export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> }) {
   const camera = useThree((s) => s.camera);
@@ -67,6 +68,11 @@ export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> 
   const t = useRef(0);
   const sway = useRef(new THREE.Vector2());
   const offset = useMemo(() => new THREE.Vector3(), []);
+  const phone = useRef<THREE.Group>(null);
+  const torchModel = useRef<THREE.Group>(null);
+  const lens = useRef<THREE.MeshStandardMaterial>(null);
+  /** which one is in hand, and the 0→1 dip of a swap in progress */
+  const swap = useRef({ strong: false, k: 1 });
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -82,9 +88,20 @@ export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> 
     sway.current.y = THREE.MathUtils.damp(sway.current.y, ty, 10, dt);
     lag.current.slerp(camera.quaternion, 1 - Math.exp(-12 * dt));
     g.quaternion.copy(lag.current);
-    offset.set(0.2 + sway.current.x, -0.335 - sway.current.y, -0.42).applyQuaternion(camera.quaternion);
+    // swapping: the one in hand drops out of view, the other rises into it
+    const sw = swap.current;
+    if (sw.strong !== s.strong && sw.k >= 1) sw.k = 0;
+    if (sw.k < 1) {
+      sw.k = Math.min(1, sw.k + dt / 0.45);
+      if (sw.k >= 0.5) sw.strong = s.strong;
+    }
+    const dip = Math.sin(Math.PI * sw.k) * 0.22;
+    if (phone.current) phone.current.visible = !sw.strong;
+    if (torchModel.current) torchModel.current.visible = sw.strong;
+    offset.set(0.2 + sway.current.x, -0.335 - sway.current.y - dip, -0.42).applyQuaternion(camera.quaternion);
     g.position.copy(camera.position).add(offset);
     if (led.current) led.current.emissiveIntensity = s.on ? 4 * s.intensity : 0;
+    if (lens.current) lens.current.emissiveIntensity = s.on ? 6 * s.intensity : 0;
     if (s.on !== lastOn.current) {
       lastOn.current = s.on;
       screen.draw(s.on);
@@ -94,7 +111,7 @@ export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> 
   return (
     <group ref={root}>
       {/* tipped back a little, top edge towards the station */}
-      <group rotation={[-0.42, -0.12, 0.05]}>
+      <group ref={phone} rotation={[-0.42, -0.12, 0.05]}>
         <mesh>
           <boxGeometry args={[0.072, 0.15, 0.0085]} />
           <meshStandardMaterial color="#15171a" roughness={0.35} metalness={0.55} />
@@ -108,6 +125,27 @@ export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> 
           <circleGeometry args={[0.004, 10]} />
           <meshStandardMaterial ref={led} color="#ffffff" emissive="#fff6e8" emissiveIntensity={0} />
         </mesh>
+      </group>
+      {/* the emergency-kit flashlight: knurled black barrel, wide head, lens towards the dark */}
+      <group ref={torchModel} visible={false} userData={{ warm: true }} position={[0.01, 0.125, 0.0]} rotation={[0.1, 0.16, 0]}>
+        <group rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh position={[0, -0.03, 0]}>
+            <cylinderGeometry args={[0.017, 0.017, 0.15, 14]} />
+            <meshStandardMaterial color="#34363a" roughness={0.45} metalness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.07, 0]}>
+            <cylinderGeometry args={[0.027, 0.018, 0.05, 16]} />
+            <meshStandardMaterial color="#2a2b2d" roughness={0.35} metalness={0.8} />
+          </mesh>
+          <mesh position={[0, 0.02, 0.017]}>
+            <boxGeometry args={[0.012, 0.025, 0.006]} />
+            <meshStandardMaterial color="#7d1d18" roughness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.0955, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.024, 16]} />
+            <meshStandardMaterial ref={lens} color="#ffffff" emissive="#fff3dc" emissiveIntensity={0} />
+          </mesh>
+        </group>
       </group>
     </group>
   );

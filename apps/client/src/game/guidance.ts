@@ -58,8 +58,8 @@ export function objectiveStep(level: LevelDef, snap: WorldSnapshot, me: Survivor
     case 'decode':
       return {
         target: itemPos(level, snap, 'pa_console')!,
-        step: snap.world.decodeOrder
-          ? `Enter ${snap.world.decodeOrder.map((r) => snap.world.reelDigits[`reel_${r.toLowerCase()}`] ?? '?').join(' ')} at the announcement console`
+        step: snap.world.decodeCode
+          ? `Enter ${snap.world.decodeCode.split('').join(' ')} at the announcement console`
           : 'Wait for the announcement at the console',
       };
     case 'exit':

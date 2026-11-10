@@ -9,6 +9,8 @@ export const BINDINGS = {
   crouch: ['ControlLeft', 'ControlRight', 'KeyC'],
   interact: ['KeyE'],
   flashlight: ['KeyF'],
+  /** phone torch ⇄ the flashlight, once she has found it */
+  swap: ['KeyX'],
   ability: ['KeyQ'],
   journal: ['Tab'],
   radio: ['KeyT'],

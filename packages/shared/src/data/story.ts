@@ -8,7 +8,7 @@ export const OBJECTIVES: { id: ObjectiveId; title: string; hint: string }[] = [
   { id: 'reels', title: 'Recover the three SHUNYA audio reels', hint: 'Follow the marker to each reel. Up close they hiss like a running tape. Each one gives a number: your journal (Tab) keeps them.' },
   { id: 'power', title: 'Restore electricity at the fuse box', hint: 'Unlock the Maintenance Room (east end of the building) with the key. Set each fuse to the rating from the logbook; the fuse panel shows it.' },
   { id: 'decode', title: 'Decode the platform announcement', hint: 'Enter the reel numbers at the console in the Signal Room in the order the announcement called. Missed it? The console and your journal (Tab) keep the order, and the console can replay it.' },
-  { id: 'exit', title: 'Open the station exit', hint: 'Go to the collapsible gate at the back of the Waiting Hall and start the gate motor (E).' },
+  { id: 'exit', title: 'Open the station exit', hint: 'Go to the steel exit doors at the back of the Waiting Hall and start the door motor (E).' },
   { id: 'escape', title: 'Escape before the Caller takes you', hint: 'Run through the exit corridor behind the gate to the street. Do not stop.' },
 ];
 
@@ -63,7 +63,7 @@ export const STORY_BEATS: Record<StoryBeatId, { title: string; text: string; nex
   decode: {
     title: 'The third call, answered',
     text: "Every speaker falls silent. Then, in your mother's voice, softly: \"Go. Now. Don't look back for me.\" Far away, the gate motor groans awake.",
-    next: 'Open the collapsible gate at the back of the Waiting Hall.',
+    next: 'Open the steel exit doors at the back of the Waiting Hall.',
   },
   exit: {
     title: 'Run',
@@ -167,8 +167,9 @@ export const RADIO = {
 export const ANNOUNCEMENTS = {
   arrival: (name: string) =>
     `Attention please. Passenger ${name}. Passenger ${name}. Please proceed to Platform Zero. Your train is arriving.`,
-  decodeOrder: (order: string[]) =>
-    `Jatri-gon, mon dewa shunun. The third call will come in this order: reel ${order[0]}, then reel ${order[1]}, then reel ${order[2]}. Please do not answer.`,
+  /** after the power returns: the reel order and the console code it spells, said twice */
+  decodeOrder: (order: string[], code: string) =>
+    `Jatri-gon, mon dewa shunun. The third call will come in this order: reel ${order[0]}, then reel ${order[1]}, then reel ${order[2]}. The code is ${code.split('').join(', ')}. I repeat, ${code.split('').join(', ')}. Please do not answer.`,
   garbled: [
     'Attention please... the 3:13 local to... ... has been... cancelled. Passengers are requested to remain where they can be heard.',
     'Platform Zero... Platform Zero... somebody is waiting for you on Platform Zero.',

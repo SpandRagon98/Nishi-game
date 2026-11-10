@@ -400,11 +400,6 @@ export function Decor() {
           <dodecahedronGeometry args={[0.35 + (i % 3) * 0.15]} />
         </mesh>
       ))}
-      {/* the street beyond the shutter: sodium light leaking under it */}
-      <mesh position={[-10, 0.25, -21.95]}>
-        <planeGeometry args={[3.8, 0.5]} />
-        <meshBasicMaterial color="#c98a3a" />
-      </mesh>
     </group>
   );
 }

@@ -2,7 +2,7 @@ import { ADITI_THOUGHTS, OBJECTIVES, PLATFORM_ZERO, applyMatchResult, type Match
 import { audio } from '../audio/engine';
 import { speak } from '../audio/speech';
 import { app, useApp } from '../state/store';
-import { CUT_SECONDS, playCutscene } from './cutscene';
+import { playCutscene } from './cutscene';
 import { addApparition, fx, now } from './fx';
 import type { GameSession } from './session';
 
@@ -128,10 +128,10 @@ export function handleSimEvent(e: SimEvent, session: GameSession) {
       s.toast({ title: `✓ ${o.title}`, text: next && !story ? `Next: ${next.title}` : undefined, tone: 'good' }, 3500);
       if (!story) break;
       // a short cutscene, Aditi's own words over it, then the story card
-      const cut = !!snap && !!me && playCutscene(e.id, me, PLATFORM_ZERO, snap);
+      const cut = snap && me ? playCutscene(e.id, me, PLATFORM_ZERO, snap) : 0;
       const thought = ADITI_THOUGHTS.after[e.id];
       if (thought && me?.characterId === 'aditi') setTimeout(() => mutter(thought), cut ? 1300 : 600);
-      setTimeout(() => app().beat(e.id), cut ? CUT_SECONDS * 1000 : 0);
+      setTimeout(() => app().beat(e.id), cut * 1000);
       break;
     }
     case 'checkpoint':

@@ -207,6 +207,9 @@ export function GhostActor() {
     last.current.copy(grp.position);
     c.stunned = g.mode === 'stunned';
     c.opacity = warn ? 0.22 + 0.12 * Math.sin(t * 1.6) : 0.94;
+    // hunting and within reach: she lunges for you
+    const d = Math.hypot(g.pos.x - runtime.eye.x, g.pos.z - runtime.eye.z);
+    c.scare = g.mode === 'hunt' && g.visible ? THREE.MathUtils.clamp(1 - (d - 1.2) / 4, 0, 1) : 0;
   });
   return (
     <group ref={group} visible={false} userData={{ warm: true }}>
@@ -238,7 +241,10 @@ export function Apparitions() {
         if (kind === 'shadow') {
           slots[i].shadow.uniforms.uTime.value = t;
           slots[i].shadow.uniforms.uOpacity.value = fade * 0.9;
-        } else slots[i].spectral.opacity = fade * 0.85;
+        } else {
+          slots[i].spectral.opacity = fade * 0.85;
+          slots[i].spectral.scare = a.scare ? 1 : 0;
+        }
       }
     });
   });

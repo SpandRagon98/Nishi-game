@@ -186,9 +186,12 @@ export function MistBanks({ density = 1 }: { density?: number }) {
     const m = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { uTex: { value: tex }, uTime: { value: 0 }, uColor: { value: new THREE.Color('#4f7178') }, uDensity: { value: density } },
+      uniforms: {
+        uTex: { value: tex }, uTime: { value: 0 }, uColor: { value: new THREE.Color('#4f7178') }, uDensity: { value: density },
+        uTorchPos: { value: new THREE.Vector3() }, uTorchDir: { value: new THREE.Vector3() }, uTorch: { value: 0 }, uCos: { value: 0.9 },
+      },
       vertexShader: /* glsl */ `
-        uniform float uTime; attribute vec4 aBank; varying vec2 vUv; varying float vFade;
+        uniform float uTime; attribute vec4 aBank; varying vec2 vUv; varying float vFade; varying vec3 vW;
         void main() {
           vUv = uv;
           vec3 c = aBank.xyz;
@@ -200,6 +203,7 @@ export function MistBanks({ density = 1 }: { density?: number }) {
           vec3 up = vec3(0.0, 1.0, 0.0);
           float size = aBank.w;
           vec3 p = c + right * position.x * size * 1.6 + up * position.y * size * 0.55;
+          vW = p;
           vec4 mv = viewMatrix * vec4(p, 1.0);
           // fade by the bank's centre, so all four corners agree and the quad never tears
           float d = -(viewMatrix * vec4(c, 1.0)).z;
@@ -210,17 +214,28 @@ export function MistBanks({ density = 1 }: { density?: number }) {
           if (vFade < 0.002) gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
         }`,
       fragmentShader: /* glsl */ `
-        uniform sampler2D uTex; uniform vec3 uColor; uniform float uDensity; varying vec2 vUv; varying float vFade;
+        uniform sampler2D uTex; uniform vec3 uColor; uniform float uDensity;
+        uniform vec3 uTorchPos; uniform vec3 uTorchDir; uniform float uTorch; uniform float uCos;
+        varying vec2 vUv; varying float vFade; varying vec3 vW;
         void main() {
           float a = texture2D(uTex, vUv).a * 0.26 * vFade / max(0.6, sqrt(uDensity));
           if (a < 0.003) discard;
-          gl_FragColor = vec4(uColor, a);
+          // the torch beam catches the mist it passes through: a warm shaft of lit haze
+          vec3 d = vW - uTorchPos;
+          float len = max(length(d), 1e-3);
+          float lit = smoothstep(uCos - 0.05, uCos + 0.03, dot(d / len, uTorchDir)) * (1.0 - smoothstep(4.0, 22.0, len)) * uTorch;
+          gl_FragColor = vec4(mix(uColor, vec3(1.0, 0.93, 0.8), min(1.0, lit * 0.8)), a * (1.0 + lit * 1.4));
         }`,
     });
     return { geo: g, mat: m };
   }, [density]);
   useFrame((_, dt) => {
-    mat.uniforms.uTime.value += dt;
+    const u = mat.uniforms;
+    u.uTime.value += dt;
+    (u.uTorchPos.value as THREE.Vector3).copy(torch.pos);
+    (u.uTorchDir.value as THREE.Vector3).copy(torch.dir);
+    u.uTorch.value = torch.on ? torch.strength : 0;
+    u.uCos.value = torch.cos;
   });
   return <mesh geometry={geo} material={mat} frustumCulled={false} renderOrder={3} />;
 }

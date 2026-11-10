@@ -57,17 +57,25 @@ export function computeLightLevel(def: LightDef, t: number): number {
   return f;
 }
 
-const coneMaterial = () =>
+/** shared clock for the light shafts' drifting haze; any shaft's frame sets it */
+export const shaftTime = { value: 0 };
+
+/**
+ * Additive light cone. Mist drifts through it (slow world-space noise), and `uSoft` keeps it visible
+ * when you stand inside the beam looking along it (headlights) instead of only from the side.
+ */
+export const coneMaterial = () =>
   new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    uniforms: { uColor: { value: new THREE.Color() }, uOpacity: { value: 0 } },
+    uniforms: { uColor: { value: new THREE.Color() }, uOpacity: { value: 0 }, uSoft: { value: 0 }, uTime: shaftTime },
     vertexShader: /* glsl */ `
-      varying float vH; varying float vEdge; varying float vDepth;
+      varying float vH; varying float vEdge; varying float vDepth; varying vec3 vW;
       void main() {
         vH = uv.y;
+        vW = (modelMatrix * vec4(position, 1.0)).xyz;
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         vDepth = -mv.z;
         vec3 n = normalize(normalMatrix * normal);
@@ -75,11 +83,14 @@ const coneMaterial = () =>
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
-      uniform vec3 uColor; uniform float uOpacity;
-      varying float vH; varying float vEdge; varying float vDepth;
+      uniform vec3 uColor; uniform float uOpacity; uniform float uSoft; uniform float uTime;
+      varying float vH; varying float vEdge; varying float vDepth; varying vec3 vW;
       void main() {
+        float edge = mix(pow(max(vEdge, 1e-4), 1.4), 0.55, uSoft);
+        // slow rolling mist inside the beam
+        float mist = 0.7 + 0.3 * sin(vW.x * 1.3 + vW.z * 0.9 + uTime * 0.35) * sin(vW.y * 1.9 + vW.z * 1.1 - uTime * 0.27);
         // fade out as the camera gets close or walks through it, so it never washes the screen
-        float a = pow(max(vH, 1e-4), 1.6) * pow(max(vEdge, 1e-4), 1.4) * uOpacity * smoothstep(1.2, 4.5, vDepth);
+        float a = pow(max(vH, 1e-4), 1.6) * edge * mist * uOpacity * smoothstep(1.2, 4.5, vDepth);
         gl_FragColor = vec4(uColor * a, a);
       }`,
   });
@@ -97,6 +108,7 @@ function Fixture({ def, shafts }: { def: LightDef; shafts: boolean }) {
   const indoor = def.pos.y < 4.5;
   const coneH = !shafts ? 0 : def.kind === 'tube' ? (def.pos.y < 0 ? 2.8 : indoor ? 3.8 : 4.6) : def.kind === 'bulb' ? 3.2 : 0;
   useFrame(() => {
+    shaftTime.value = now();
     const lv = lightLevels.get(def.id) ?? 0;
     tubeMat.emissiveIntensity = lv * (def.kind === 'lamp' ? 6 : def.kind === 'lantern' ? 8 : 3.2);
     cone.uniforms.uOpacity.value = lv * (def.kind === 'tube' ? 0.07 : 0.05);

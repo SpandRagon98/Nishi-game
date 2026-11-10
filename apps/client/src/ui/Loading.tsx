@@ -95,7 +95,7 @@ export function Loading() {
         {ready && start?.kind !== 'multi' && <Btn primary onClick={begin}>Enter the station</Btn>}
         {ready && start?.kind === 'multi' && <p className="muted">Joining your team…</p>}
         <div className="controls-hint">
-          {[['WASD', 'move'], ['Shift', 'sprint'], ['C', 'crouch'], ['E', 'interact'], ['F', 'flashlight'], ['Q', 'ability'], ['Tab', 'journal'], ['Esc', 'pause']].map(([k, v]) => (
+          {[['WASD', 'move'], ['Shift', 'sprint'], ['C', 'crouch'], ['E', 'interact'], ['F', 'light'], ['X', 'phone ⇄ flashlight'], ['Q', 'ability'], ['Tab', 'journal'], ['Esc', 'pause']].map(([k, v]) => (
             <span key={k}><kbd>{k}</kbd> {v}</span>
           ))}
         </div>

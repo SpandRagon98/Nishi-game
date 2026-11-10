@@ -93,6 +93,10 @@ describe('MatchSimulation — solo playthrough', () => {
     expect(use('pa_console').ok).toBe(false);
     const replay = sim.drainEvents().find((e) => e.type === 'announcement');
     expect(replay && 'text' in replay && replay.text).toContain(`reel ${order[0]}, then reel ${order[1]}, then reel ${order[2]}`);
+    // and it reads out the console code itself
+    const code = sim.snapshot().world.decodeCode!;
+    expect(code).toMatch(/^\d{3}$/);
+    expect(replay && 'text' in replay && replay.text).toContain(`The code is ${code.split('').join(', ')}`);
   });
 
   it('never leaks puzzle solutions before they are discovered', () => {

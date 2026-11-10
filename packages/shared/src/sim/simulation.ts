@@ -142,6 +142,7 @@ export class MatchSimulation {
       fuse: { slots: [5, 5, 5, 5], solved: false, lockoutUntil: 0, clue: null },
       reelDigits: {},
       decodeOrder: null,
+      decodeCode: null,
       keypadLockoutUntil: 0,
       decoded: false,
       exitOpenAt: 0,
@@ -455,7 +456,7 @@ export class MatchSimulation {
         if (w.decoded) return fail('The announcement has already been decoded.');
         if (!w.objectives.reels) {
           // the console replays the last announcement, so the reel order can never be missed for good
-          if (w.decodeOrder) this.emit({ type: 'announcement', text: ANNOUNCEMENTS.decodeOrder(w.decodeOrder), to: [id] });
+          if (w.decodeOrder && w.decodeCode) this.emit({ type: 'announcement', text: ANNOUNCEMENTS.decodeOrder(w.decodeOrder, w.decodeCode), to: [id] });
           return fail('You need all three reels to decode the announcement.');
         }
         this.emit({ type: 'puzzle', puzzle: 'keypad', to: [id] });
@@ -532,7 +533,8 @@ export class MatchSimulation {
       this.world.decodeOrder = null;
       this.after(4, () => {
         this.world.decodeOrder = [...this.order];
-        this.emit({ type: 'announcement', text: ANNOUNCEMENTS.decodeOrder(this.order) });
+        this.world.decodeCode = this.order.map((l) => this.digits[`reel_${l.toLowerCase()}`]).join('');
+        this.emit({ type: 'announcement', text: ANNOUNCEMENTS.decodeOrder(this.order, this.world.decodeCode) });
       });
       return { ok: true };
     }

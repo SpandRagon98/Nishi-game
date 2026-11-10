@@ -72,7 +72,8 @@ add(box(-30.3, H, -14.3, 30.3, H + 0.3, 0, 'ceiling', 'ceiling'));
 add(...wallZ(-12.3, -12, -22, -14.3, 0, 3.2, 'brick'));
 add(...wallZ(-8, -7.7, -22, -14.3, 0, 3.2, 'brick'));
 add(box(-12.3, 3.2, -22.3, -7.7, 3.4, -14.3, 'ceiling', 'ceiling'));
-add(box(-12.3, 0, -22.3, -7.7, 3.2, -22, 'rust', 'wall', { id: 'street_shutter' }));
+// the street shutter is jammed half-up: Kabir's headlights shine in under it
+add(box(-12.3, 1.45, -22.3, -7.7, 3.2, -22, 'rust', 'wall', { id: 'street_shutter' }));
 
 // ───────────────────────── Boundaries ─────────────────────────
 add(box(-40, -1.2, -T, -30.3, 3, 0, 'brick', 'wall'));
@@ -239,7 +240,7 @@ export const PLATFORM_ZERO: LevelDef = {
     })),
     { id: 'fuse_box', kind: 'fuse_box', label: 'Fuse box', pos: v3(25, 1.5, -13.6), zone: 'maintenance', radius: 2.7 },
     { id: 'pa_console', kind: 'pa_console', label: 'Announcement console', pos: v3(18.5, 1.05, -7.5), zone: 'signal', radius: 2.7 },
-    { id: 'exit_gate', kind: 'exit_gate', label: 'Collapsible exit gate', pos: v3(-10, 1.2, -13.7), zone: 'concourse', radius: 2.6 },
+    { id: 'exit_gate', kind: 'exit_gate', label: 'Exit doors: start the motor', pos: v3(-10, 1.2, -13.7), zone: 'concourse', radius: 2.6 },
     { id: 'note_ticket', kind: 'note', label: 'Old ticket stub', pos: v3(-27.2, 1.12, -6.2), zone: 'ticket', radius: 2.5 },
     { id: 'note_memo', kind: 'note', label: 'Typed memorandum', pos: v3(12.5, 1.22, -12.9), zone: 'signal', radius: 2.5 },
     { id: 'note_photo', kind: 'note', label: 'Faded photograph', pos: v3(-4.2, 0.52, 11), zone: 'carriage', radius: 2.5 },

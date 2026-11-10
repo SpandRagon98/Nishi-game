@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { audio } from '../audio/engine';
 import { now } from '../game/fx';
 import { runtime } from '../game/runtime';
+import { coneMaterial, shaftTime } from './Lights';
 
 export const DOOR_GROUP = interactionGroups(1);
 
@@ -54,23 +55,116 @@ function Door({ def, materials }: { def: DoorDef; materials: Record<MaterialId, 
   );
 }
 
-/** Collapsible scissor gate at the exit; its collider disappears once open. */
-function ExitGate({ level }: { level: LevelDef }) {
-  const lattice = useRef<THREE.Group>(null);
+/** 0 = shut, 1 = fully open; the motor takes 6 s once the gate is released */
+export function exitProgress() {
+  const snap = runtime.snap;
+  const w = snap?.world;
+  if (w?.exitOpen) return 1;
+  if (!w?.exitOpenAt) return 0;
+  return Math.max(0, Math.min(1, 1 - (w.exitOpenAt - (snap?.time ?? 0)) / 6));
+}
+
+/** soft elongated pool of light, for the headlights on the corridor floor */
+function poolTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 256;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(32, 0, 0, 32, 0, 256);
+  grad.addColorStop(0, 'rgba(255,236,200,1)');
+  grad.addColorStop(0.5, 'rgba(255,220,170,0.35)');
+  grad.addColorStop(1, 'rgba(255,220,170,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 256);
+  return new THREE.CanvasTexture(c);
+}
+
+/**
+ * The way out: a pair of riveted steel doors in a heavy frame. Once the gate is released the motor
+ * judders them open, swinging out into the exit corridor, and Kabir's headlights pour in through the
+ * mist. The collider stays until they are fully open.
+ */
+function ExitGate({ level, materials }: { level: LevelDef; materials: Record<MaterialId, THREE.Material> }) {
+  const left = useRef<THREE.Group>(null);
+  const right = useRef<THREE.Group>(null);
+  const outside = useRef<THREE.Group>(null);
   const [solid, setSolid] = useState(true);
   const gb = level.exitGate;
-  const bars = useMemo(() => Array.from({ length: 18 }, (_, i) => i), []);
+  const x0 = gb.c[0] - gb.s[0] / 2;
+  const x1 = gb.c[0] + gb.s[0] / 2;
+  const z = gb.c[2];
+  const leafW = gb.s[0] / 2 - 0.02;
+  const leafH = gb.s[1] - 0.06;
+  const m = useMemo(() => {
+    const beam = coneMaterial();
+    (beam.uniforms.uColor.value as THREE.Color).set('#ffe2b8');
+    beam.uniforms.uSoft.value = 1;
+    return {
+      steel: new THREE.MeshStandardMaterial({ color: '#4b4f4c', metalness: 0.7, roughness: 0.48 }),
+      frame: new THREE.MeshStandardMaterial({ color: '#2b2d2b', metalness: 0.6, roughness: 0.55 }),
+      // wired glass: the headlights outside already glow faintly through it while the doors are shut
+      glass: new THREE.MeshStandardMaterial({ color: '#141a1d', emissive: new THREE.Color('#d9a56a'), emissiveIntensity: 0.06, roughness: 0.2, metalness: 0.3 }),
+      lamp: new THREE.MeshStandardMaterial({ color: '#220806', emissive: new THREE.Color('#ff2a12'), emissiveIntensity: 2.4 }),
+      beam,
+      flare: new THREE.SpriteMaterial({ map: glintMat().map, color: '#fff1d8', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
+      car: new THREE.MeshStandardMaterial({ color: '#15171a', metalness: 0.6, roughness: 0.35 }),
+      pool: new THREE.MeshBasicMaterial({ map: poolTexture(), color: '#ffdcae', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }),
+    };
+  }, []);
   useFrame(() => {
-    const snap = runtime.snap;
-    const w = snap?.world;
-    let progress = 0;
-    if (w?.exitOpen) progress = 1;
-    else if (w?.exitOpenAt) progress = Math.max(0, Math.min(1, 1 - (w.exitOpenAt - (snap?.time ?? 0)) / 6));
-    if (lattice.current) lattice.current.scale.x = 1 - progress * 0.88 + Math.sin(now() * 40) * (progress > 0 && progress < 1 ? 0.004 : 0);
-    const shouldBeSolid = !w?.exitOpen;
+    const p = exitProgress();
+    const t = now();
+    const moving = p > 0 && p < 1;
+    // the motor hesitates, catches, then drives them steadily: eased with a little judder while running
+    const ease = p < 0.08 ? p * 0.6 : 0.048 + (1 - (1 - (p - 0.08) / 0.92) ** 2) * 0.952;
+    const a = ease * 1.5 + (moving ? Math.sin(t * 29) * 0.006 : 0);
+    if (left.current) left.current.rotation.y = a;
+    if (right.current) right.current.rotation.y = -a;
+    // red while locked, a slow amber pulse while the motor runs, green once it's open
+    m.lamp.emissive.set(p >= 1 ? '#39ff6a' : moving ? '#ffae1a' : '#ff2a12');
+    m.lamp.emissiveIntensity = moving ? 1.6 + Math.sin(t * 4) * 1.0 : 2.4;
+    const light = THREE.MathUtils.smoothstep(p, 0.02, 0.5);
+    m.glass.emissiveIntensity = 0.06 + light * 0.3;
+    m.beam.uniforms.uOpacity.value = light * 0.38;
+    shaftTime.value = t;
+    m.pool.opacity = light * 0.4;
+    m.flare.opacity = 0.35 + light * 0.65;
+    if (outside.current) outside.current.visible = p > 0;
+    const shouldBeSolid = !runtime.snap?.world.exitOpen;
     if (shouldBeSolid !== solid) setSolid(shouldBeSolid);
   });
-  const x0 = gb.c[0] - gb.s[0] / 2;
+  const leaf = (side: 1 | -1) => (
+    // built along +x from its hinge; the right leaf is mirrored
+    <group scale={[side, 1, 1]}>
+      <mesh position={[leafW / 2, leafH / 2 + 0.03, 0]} material={materials.rust} castShadow>
+        <boxGeometry args={[leafW, leafH, 0.07]} />
+      </mesh>
+      {/* stiles, rails and the window frame stand proud of the sheet */}
+      {[0.06, leafW - 0.06].map((x) => (
+        <mesh key={x} position={[x, leafH / 2 + 0.03, 0.045]} material={m.steel}>
+          <boxGeometry args={[0.1, leafH, 0.03]} />
+        </mesh>
+      ))}
+      {[0.12, 1.15, 1.75, leafH - 0.06].map((y) => (
+        <mesh key={y} position={[leafW / 2, y, 0.045]} material={m.steel}>
+          <boxGeometry args={[leafW - 0.1, 0.08, 0.03]} />
+        </mesh>
+      ))}
+      <mesh position={[leafW / 2, 2.35, 0.04]} material={m.glass}>
+        <boxGeometry args={[0.52, 0.5, 0.02]} />
+      </mesh>
+      {/* wire in the glass */}
+      {[-0.13, 0, 0.13].map((d) => (
+        <mesh key={d} position={[leafW / 2 + d, 2.35, 0.052]} material={m.frame}>
+          <boxGeometry args={[0.012, 0.5, 0.005]} />
+        </mesh>
+      ))}
+      {/* push bar */}
+      <mesh position={[leafW * 0.55, 1.0, 0.11]} rotation={[0, 0, Math.PI / 2]} material={m.frame}>
+        <cylinderGeometry args={[0.025, 0.025, leafW * 0.75, 8]} />
+      </mesh>
+    </group>
+  );
   return (
     <group>
       {solid && (
@@ -78,31 +172,62 @@ function ExitGate({ level }: { level: LevelDef }) {
           <CuboidCollider args={[gb.s[0] / 2, gb.s[1] / 2, gb.s[2] / 2]} position={gb.c} />
         </RigidBody>
       )}
-      <group ref={lattice} position={[x0, 0, gb.c[2]]}>
-        {bars.map((i) => (
-          <mesh key={i} position={[(i / 17) * gb.s[0], 1.5, 0]}>
-            <boxGeometry args={[0.025, 3, 0.025]} />
-            <meshStandardMaterial color="#3a2c22" metalness={0.6} roughness={0.5} />
-          </mesh>
-        ))}
-        {bars.slice(0, 17).map((i) =>
-          [0.8, 2.2].map((y, k) => (
-            <mesh key={`${i}-${k}`} position={[((i + 0.5) / 17) * gb.s[0], y, 0.02]} rotation={[0, 0, k % 2 ? 0.9 : -0.9]}>
-              <boxGeometry args={[0.018, 0.4, 0.018]} />
-              <meshStandardMaterial color="#45352a" metalness={0.6} roughness={0.5} />
-            </mesh>
-          )),
-        )}
-        <mesh position={[gb.s[0] / 2, 3.05, 0]}>
-          <boxGeometry args={[gb.s[0], 0.1, 0.08]} />
-          <meshStandardMaterial color="#2e241d" metalness={0.6} roughness={0.5} />
-        </mesh>
+      {/* nobody crawls out under the jammed street shutter: the escape zone ends the run before it */}
+      <RigidBody type="fixed" colliders={false}>
+        <CuboidCollider args={[2.3, 0.75, 0.15]} position={[gb.c[0], 0.75, -22.15]} />
+      </RigidBody>
+      <group ref={left} position={[x0, 0, z]}>
+        {leaf(1)}
       </group>
+      <group ref={right} position={[x1, 0, z]}>
+        {leaf(-1)}
+      </group>
+      {/* the frame: posts, a deep lintel and the status lamp */}
+      {[x0 - 0.06, x1 + 0.06].map((x) => (
+        <mesh key={x} position={[x, gb.s[1] / 2, z + 0.12]} material={m.frame}>
+          <boxGeometry args={[0.14, gb.s[1], 0.36]} />
+        </mesh>
+      ))}
+      <mesh position={[gb.c[0], gb.s[1] + 0.09, z + 0.12]} material={m.frame}>
+        <boxGeometry args={[gb.s[0] + 0.26, 0.18, 0.36]} />
+      </mesh>
+      <mesh position={[x1 + 0.06, gb.s[1] + 0.3, z + 0.32]} material={m.lamp}>
+        <sphereGeometry args={[0.07, 12, 8]} />
+      </mesh>
       {/* gate motor box */}
-      <mesh position={[gb.c[0] + 2.4, 2.6, gb.c[2] + 0.25]}>
+      <mesh position={[x1 + 0.5, 2.6, z + 0.25]}>
         <boxGeometry args={[0.5, 0.6, 0.3]} />
         <meshStandardMaterial color="#4a4d47" metalness={0.5} roughness={0.6} />
       </mesh>
+      {/* outside: Kabir's car at the end of the corridor, headlights on full */}
+      <group ref={outside} visible={false} userData={{ warm: true }}>
+        {/* the old Ambassador, nose-in to the gate, and the wet road under it */}
+        <mesh material={m.car} position={[gb.c[0], 0.62, -24.8]}>
+          <boxGeometry args={[1.8, 0.7, 4.2]} />
+        </mesh>
+        <mesh material={m.car} position={[gb.c[0], 1.22, -25.3]}>
+          <boxGeometry args={[1.55, 0.55, 2.0]} />
+        </mesh>
+        <mesh material={m.car} position={[gb.c[0], 0.01, -26]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[12, 8]} />
+        </mesh>
+        {/* a sodium streetlight across the road, so the car reads as a silhouette */}
+        <mesh position={[gb.c[0], 2, -29.5]}>
+          <planeGeometry args={[14, 6]} />
+          <meshBasicMaterial color="#5a3a1a" />
+        </mesh>
+        {[-0.62, 0.62].map((dx) => (
+          <group key={dx} position={[gb.c[0] + dx, 0.72, -22.66]}>
+            <sprite material={m.flare} scale={[1.9, 1.9, 1]} />
+            <mesh material={m.beam} rotation={[-Math.PI / 2 - 0.03, 0, 0]} position={[0, 0, 5]}>
+              <coneGeometry args={[1.9, 10, 24, 1, true]} />
+            </mesh>
+          </group>
+        ))}
+        <mesh material={m.pool} rotation={[-Math.PI / 2, 0, 0]} position={[gb.c[0], 0.02, -17]}>
+          <planeGeometry args={[3.6, 9.5]} />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -317,7 +442,7 @@ export function Interactables({ level, materials }: { level: LevelDef; materials
       {level.doors.map((d) => (
         <Door key={d.id} def={d} materials={materials} />
       ))}
-      <ExitGate level={level} />
+      <ExitGate level={level} materials={materials} />
       {level.interactables.filter((i) => i.kind !== 'exit_gate').map((i) => (
         <Item key={i.id} def={i} />
       ))}

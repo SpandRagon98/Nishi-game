@@ -16,6 +16,7 @@ export function TouchControls() {
   const prompt = useApp((s) => s.hud.prompt);
   const hiding = useApp((s) => s.hud.hiding);
   const torch = useApp((s) => s.hud.flashlight);
+  const hasFlash = useApp((s) => s.hud.hasFlashlight);
   const ability = useApp((s) => s.hud.abilityName);
   const cooldown = useApp((s) => Math.ceil(s.hud.abilityLeft));
   const overlay = useApp((s) => s.overlay);
@@ -129,6 +130,7 @@ export function TouchControls() {
         <div className="touch-buttons">
           <button className={`tbtn use${prompt || hiding ? ' ready' : ''}`} {...hold('KeyE')}>{hiding ? 'Leave' : 'Use'}</button>
           <button className={`tbtn${torch ? ' on' : ''}`} {...hold('KeyF')}>Torch</button>
+          {hasFlash && <button className="tbtn" {...hold('KeyX')}>Swap</button>}
           <button className="tbtn" {...hold('KeyQ')}>{cooldown > 0 ? `${cooldown}s` : ability || 'Echo'}</button>
           <button
             className={`tbtn${crouch ? ' on' : ''}`}

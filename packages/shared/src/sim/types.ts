@@ -69,6 +69,8 @@ export interface WorldView {
   fuse: { slots: number[]; solved: boolean; lockoutUntil: number; clue: number[] | null };
   reelDigits: Record<string, number>;
   decodeOrder: string[] | null;
+  /** the console code the announcement read out, kept for the journal and replays */
+  decodeCode: string | null;
   keypadLockoutUntil: number;
   decoded: boolean;
   /** time at which the gate finishes opening (0 = not started) */

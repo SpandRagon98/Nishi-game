@@ -17,7 +17,6 @@ export const VOICES = {
   caller: 'e5666b9c-99a2-4fac-8b4e-abee078b186d', // Vlad, played slowed
 };
 
-const perms = (a: string[]): string[][] => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map((p) => [x, ...p])));
 const lines: [keyof typeof VOICES, string][] = [
   ...PROLOGUE_TAPE.map(([, t]) => ['mother', t] as const),
   ...PROLOGUE_CALL.map(([who, t]) => [who === 'KABIR' ? 'kabir' : 'aditi', t] as const),
@@ -25,7 +24,7 @@ const lines: [keyof typeof VOICES, string][] = [
   ['mother', PHONE_LINES[0].match(/"([^"]+)"/)![1]],
   ...[...RADIO.intro, RADIO.afterFlashlight, RADIO.afterOffice, RADIO.afterPower, RADIO.afterDecode].map((l) => ['kabir', l.text] as const),
   ...[...ADITI_THOUGHTS.ambient, ...Object.values(ADITI_THOUGHTS.after)].map((t) => ['aditi', t!] as const),
-  ...perms(['A', 'B', 'C']).map((o) => ['announcer', ANNOUNCEMENTS.decodeOrder(o)] as const),
+  // the code announcement carries random digits, so it stays with the browser voice
   ...ANNOUNCEMENTS.garbled.map((t) => ['announcer', t] as const),
   ['announcer', 'This is the third call. This is the third call.'],
   ['announcer', 'Incorrect. Incorrect. Please wait where you are.'],

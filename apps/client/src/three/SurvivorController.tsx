@@ -57,6 +57,8 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
 
   const st = useRef({
     yaw: -Math.PI / 2, pitch: 0, vy: 0, eye: EYE, flash: false, crouch: false, stride: 0, bob: 0,
+    // in hand: the phone until she finds the flashlight (it's equipped on pickup); X swaps between them
+    useFlash: false, hadFlash: false,
     lastHud: 0, thinkAt: 0, thought: Math.floor(Math.random() * 8), target: null as Target | null, reviving: null as string | null, lastStep: 0, spawned: false,
     // smoothed torch: aim, brightness and the near-wall dimmer all ease so the light glides
     aim: new THREE.Vector3(0, 0, -1), torchK: 0, wallK: 1, fear: 0,
@@ -109,6 +111,9 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
         } else session.interact(t.id);
       } else if (matches('flashlight', e.code)) {
         st.current.flash = !st.current.flash;
+        audio.sfx('locked');
+      } else if (matches('swap', e.code) && me.hasFlashlight) {
+        st.current.useFlash = !st.current.useFlash;
         audio.sfx('locked');
       } else if (matches('ability', e.code)) {
         session.ability();
@@ -227,7 +232,13 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     if (moving) flags |= FLAG_MOVING;
     if (sprinting) flags |= FLAG_SPRINT;
     if (s.crouch) flags |= FLAG_CROUCH;
-    if (s.flash && me.hasFlashlight) flags |= FLAG_FLASHLIGHT;
+    if (me.hasFlashlight && !s.hadFlash) {
+      s.hadFlash = true;
+      s.useFlash = true;
+      s.flash = true;
+    }
+    const usingFlash = me.hasFlashlight && s.useFlash;
+    if (s.flash && usingFlash) flags |= FLAG_FLASHLIGHT;
     session.sendMove({ x: feet.x, y: feet.y, z: feet.z, yaw: s.yaw, pitch: s.pitch, flags });
 
     // camera
@@ -257,7 +268,7 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     // during a cutscene the torch becomes the key light, shining from the camera onto Aditi
     const flashOn = s.flash || !!cineDir;
     // the found flashlight is a proper beam; before that, Aditi's phone torch
-    const strong = me.hasFlashlight || !!cineDir;
+    const strong = usingFlash || !!cineDir;
     const threatened = gd < 10 && (g.mode === 'hunt' || g.mode === 'warn');
     s.torchK = THREE.MathUtils.damp(s.torchK, flashOn ? (threatened ? 0.35 : 1) : 0, flashOn ? 9 : 14, dt);
     s.aim.lerp(tmpV.set(fwd.x, fwd.y, fwd.z), 1 - Math.exp(-16 * dt)).normalize();
@@ -271,17 +282,18 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
       s.wallK = THREE.MathUtils.damp(s.wallK, THREE.MathUtils.clamp((d - 0.3) / 3.2, 0.25, 1), 6, dt);
     }
     const k = s.torchK * s.wallK;
-    spot.intensity = (strong ? 30 : 9) * k;
-    spot.distance = strong ? 30 : 12;
-    spot.angle = strong ? 0.38 : 0.68;
-    spot.penumbra = strong ? 0.55 : 0.9;
+    // the flashlight throws a long, tight, bright beam; the phone a weak wide wash
+    spot.intensity = (strong ? 42 : 9) * k;
+    spot.distance = strong ? 34 : 12;
+    spot.angle = strong ? 0.34 : 0.68;
+    spot.penumbra = strong ? 0.42 : 0.9;
     spot.target.position.copy(spot.position).addScaledVector(s.aim, 6);
     spot.target.updateMatrixWorld();
     torch.on = s.torchK > 0.02;
     torch.strength = k * (strong ? 1 : 0.45);
     torch.pos.copy(spot.position);
     torch.dir.copy(s.aim);
-    torch.cos = Math.cos(strong ? 0.3 : 0.55);
+    torch.cos = Math.cos(strong ? 0.27 : 0.55);
     held.current = { on: flashOn, strong, intensity: s.torchK, moving, sprinting, hidden: !!hiding || !alive || !!cineDir };
 
     // breathing: slow and cold at rest, quicker when moving, ragged when hunted or spent
@@ -347,6 +359,7 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
         exhausted: me.exhausted,
         flashlight: flashOn,
         hasFlashlight: me.hasFlashlight,
+        usingFlashlight: usingFlash,
         abilityName: ability.name,
         abilityLeft: Math.max(0, me.abilityReadyAt - snap.time),
         abilityCooldown: ability.cooldown,

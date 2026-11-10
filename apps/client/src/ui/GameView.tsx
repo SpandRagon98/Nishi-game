@@ -238,7 +238,8 @@ function SurvivorHud() {
       )}
       <div className="hud-bl">
         <div className="hud-status">
-          <span className={h.flashlight ? 'on' : ''}><kbd>F</kbd> {h.hasFlashlight ? 'Flashlight' : 'Phone torch'}</span>
+          <span className={h.flashlight ? 'on' : ''}><kbd>F</kbd> {h.usingFlashlight ? 'Flashlight' : 'Phone torch'}</span>
+          {h.hasFlashlight && <span><kbd>X</kbd> {h.usingFlashlight ? 'Phone' : 'Flashlight'}</span>}
           <span className={h.abilityActive ? 'on' : h.abilityLeft > 0 ? 'off' : ''}>
             <kbd>Q</kbd> {h.abilityName}{h.abilityLeft > 0 ? ` ${Math.ceil(h.abilityLeft)}s` : ''}
           </span>
@@ -355,7 +356,7 @@ function Journal({ session }: { session: GameSession }) {
           <h3>Notes</h3>
           <ul className="inv">
             {w.fuse.clue && <li>Logbook fuse ratings: {w.fuse.clue.map((v, i) => `${FUSE_LABELS[i].toLowerCase()} ${v}A`).join(' · ')}</li>}
-            {w.decodeOrder && <li>Announcement order: reel {w.decodeOrder.join(' → reel ')}</li>}
+            {w.decodeOrder && <li>Announcement: reel {w.decodeOrder.join(' → reel ')}{w.decodeCode && <> · console code <b>{w.decodeCode.split('').join(' ')}</b></>}</li>}
             {w.notes.map((n) => <li key={n}>{DOCUMENTS[n]?.title}</li>)}
             {!w.fuse.clue && !w.decodeOrder && !w.notes.length && <li className="muted">No notes.</li>}
           </ul>
@@ -515,13 +516,13 @@ function KeypadHelp({ w, session }: { w: WorldSnapshot['world']; session: GameSe
     <p className="puzzle-help">
       Your reels: {reels.map((r) => `${r.slice(-1).toUpperCase()} = ${w.reelDigits[r]}`).join(' · ')}
       <br />
-      {w.decodeOrder
-        ? `Announced order: reel ${w.decodeOrder.join(' → ')}${reels.length === 3 ? ` → enter ${w.decodeOrder.map((r) => w.reelDigits[`reel_${r.toLowerCase()}` as 'reel_a']).join('')}` : ''}`
-        : 'Wait for the announcement to call out the order.'}
-      {w.decodeOrder && (
+      {w.decodeOrder && w.decodeCode
+        ? `Announced: reel ${w.decodeOrder.join(' → ')} → enter ${w.decodeCode}`
+        : 'Wait for the announcement to call out the code.'}
+      {w.decodeOrder && w.decodeCode && (
         <>
           <br />
-          <Btn small onClick={() => handleSimEvent({ type: 'announcement', text: ANNOUNCEMENTS.decodeOrder(w.decodeOrder!) }, session)}>
+          <Btn small onClick={() => handleSimEvent({ type: 'announcement', text: ANNOUNCEMENTS.decodeOrder(w.decodeOrder!, w.decodeCode!) }, session)}>
             🔊 Replay the announcement
           </Btn>
         </>

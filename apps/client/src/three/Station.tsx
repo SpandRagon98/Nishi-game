@@ -143,7 +143,9 @@ const shaftMat = () =>
         float edge = smoothstep(0.0, 0.35, vUv.x) * smoothstep(1.0, 0.65, vUv.x);
         float fall = smoothstep(0.0, 0.25, vUv.y) * (0.35 + 0.65 * vUv.y);
         float flick = 0.85 + 0.15 * sin(uTime * 0.7 + vUv.x * 9.0);
-        float a = edge * fall * 0.075 * flick * smoothstep(2.0, 7.0, vDepth);
+        // mist rolling slowly down through the moonlight
+        float mist = 0.62 + 0.38 * sin(vUv.y * 7.0 + uTime * 0.45 + vUv.x * 4.0) * sin(vUv.y * 3.1 - uTime * 0.23 - vUv.x * 6.0);
+        float a = edge * fall * 0.09 * flick * mist * smoothstep(2.0, 7.0, vDepth);
         gl_FragColor = vec4(vec3(0.55, 0.78, 0.82) * a, a);
       }`,
   });

@@ -15,6 +15,8 @@ export interface GhostControl {
   /** 0..1, how fast she is moving: hair and hem stream behind */
   speed: number;
   stunned: boolean;
+  /** 0..1: how hard she goes for you. Up close she lunges, arms reaching, head snapping */
+  scare?: number;
 }
 
 const NOISE = /* glsl */ `
@@ -197,9 +199,9 @@ function faceGeometry() {
 const UPPER_ARM = lathe([[0.001, -0.345], [0.021, -0.335], [0.024, -0.3], [0.029, -0.18], [0.033, -0.07], [0.03, -0.012], [0.001, 0]], 12);
 const FOREARM = lathe([[0.001, -0.31], [0.016, -0.3], [0.017, -0.27], [0.025, -0.12], [0.024, -0.03], [0.023, 0], [0.001, 0.014]], 12);
 
-function Arm({ side, skin, bangle }: { side: 1 | -1; skin: THREE.Material; bangle: THREE.Material }) {
+function Arm({ side, skin, bangle, armRef }: { side: 1 | -1; skin: THREE.Material; bangle: THREE.Material; armRef: React.Ref<THREE.Group> }) {
   return (
-    <group position={[side * 0.185, 1.38, 0.01]} rotation={[-0.18, 0, side * 0.1]}>
+    <group ref={armRef} position={[side * 0.185, 1.38, 0.01]} rotation={[-0.18, 0, side * 0.1]}>
       <mesh material={skin} geometry={UPPER_ARM} />
       <group position={[0, -0.33, 0]} rotation={[-0.42, 0, -side * 0.06]}>
         <mesh material={skin} geometry={FOREARM} />
@@ -255,9 +257,23 @@ export function CallerFigure({ control }: { control: React.MutableRefObject<Ghos
 
   const root = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
-  useFrame(() => {
+  const armL = useRef<THREE.Group>(null);
+  const armR = useRef<THREE.Group>(null);
+  // head twitches: every so often the head snaps to a wrong angle, holds, and slowly comes back
+  const tw = useRef({ next: 0, until: 0, z: 0, y: 0, scare: 0 });
+  useFrame((_, dt) => {
     const t = now();
     const c = control.current;
+    const w = tw.current;
+    w.scare = THREE.MathUtils.damp(w.scare, c.scare ?? 0, (c.scare ?? 0) > w.scare ? 7 : 2, dt);
+    if (t > w.next) {
+      w.until = t + 0.16 + Math.random() * 0.25;
+      w.z = (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.4);
+      w.y = (Math.random() - 0.5) * 0.9;
+      // calm: a twitch every few seconds; going for you: constantly
+      w.next = t + (w.scare > 0.2 ? 0.5 + Math.random() * 0.7 : 2.5 + Math.random() * 4);
+    }
+    const snapping = t < w.until;
     u.uTime.value = t;
     u.uSpeed.value += (c.speed - u.uSpeed.value) * 0.1;
     u.uRim.value = c.stunned ? 2.4 : 1;
@@ -265,21 +281,37 @@ export function CallerFigure({ control }: { control: React.MutableRefObject<Ghos
     if (root.current) {
       // she hovers a hand's width off the floor, leaning into the chase
       root.current.position.y = 0.05 + Math.sin(t * 0.9) * 0.025;
-      root.current.rotation.x = u.uSpeed.value * 0.18;
+      root.current.rotation.x = u.uSpeed.value * 0.18 + w.scare * 0.22;
       root.current.position.x = c.stunned ? (Math.random() - 0.5) * 0.06 : 0;
+      // the lunge: she pitches forward at you
+      root.current.position.z = w.scare * 0.35;
     }
-    if (head.current) {
-      head.current.rotation.z = 0.17 + Math.sin(t * 0.55) * 0.04;
-      head.current.rotation.x = 0.1 + Math.sin(t * 0.37) * 0.03;
+    const h = head.current;
+    if (h) {
+      const z = 0.17 + Math.sin(t * 0.55) * 0.04;
+      const x = 0.1 + Math.sin(t * 0.37) * 0.03 - w.scare * 0.25;
+      if (snapping) {
+        // no easing on the way out: the snap is the scare
+        h.rotation.z = z + w.z;
+        h.rotation.y = w.y;
+      } else {
+        h.rotation.z = THREE.MathUtils.damp(h.rotation.z, z, 3, dt);
+        h.rotation.y = THREE.MathUtils.damp(h.rotation.y, 0, 3, dt);
+      }
+      h.rotation.x = x;
     }
+    // arms rise and reach out towards you
+    const reach = -0.18 - w.scare * 1.25;
+    if (armL.current) armL.current.rotation.x = reach + Math.sin(t * 7.3) * 0.04 * w.scare;
+    if (armR.current) armR.current.rotation.x = reach * 0.9 + Math.sin(t * 6.1 + 1) * 0.04 * w.scare;
   });
 
   return (
     <group ref={root}>
       <mesh geometry={parts.body} material={parts.saree} scale={[1, 1, 0.72]} />
       <mesh geometry={parts.shawl} material={parts.pallu} scale={[1, 1, 0.8]} rotation={[0, 0.4, 0.11]} />
-      <Arm side={1} skin={parts.skin} bangle={parts.bangle} />
-      <Arm side={-1} skin={parts.skin} bangle={parts.bangle} />
+      <Arm side={1} skin={parts.skin} bangle={parts.bangle} armRef={armL} />
+      <Arm side={-1} skin={parts.skin} bangle={parts.bangle} armRef={armR} />
       <mesh material={parts.skin} position={[0, 1.55, 0.008]}>
         <cylinderGeometry args={[0.036, 0.042, 0.1, 10]} />
       </mesh>
