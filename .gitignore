@@ -8,3 +8,6 @@ coverage/
 
 # Testing Studio notes and screenshots (local feedback, not part of the game)
 studio-notes/
+
+# Python caches from the voice tools
+__pycache__/
