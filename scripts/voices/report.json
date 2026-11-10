@@ -1,0 +1,459 @@
+{
+ "ref:mother_whisper": {
+  "score": 0.9,
+  "heard": "Addity, come here, Shona. Come closer. I'm right behind you.",
+  "match": 0.9,
+  "f0": null,
+  "pace": 2.75
+ },
+ "pehzzj": {
+  "role": "mother",
+  "style": "tape",
+  "text": "Aditi... if you're hearing this, I'm still at the station.",
+  "score": 0.86,
+  "heard": "A DD. If you're hearing this, I'm still at the station.",
+  "match": 0.86,
+  "f0": 241,
+  "pace": 2.71
+ },
+ "zwr3ty": {
+  "role": "mother",
+  "style": "tape",
+  "text": "Platform Zero. It isn't on any map. They built it for the recordings.",
+  "score": 1.0,
+  "heard": "Platform zero. It isn't on any map. They built it for the recordings.",
+  "match": 1.0,
+  "f0": 248,
+  "pace": 2.88
+ },
+ "1y4pwk4": {
+  "role": "mother",
+  "style": "tape",
+  "text": "It copies voices. It copied mine. Don't answer it when it calls the third time.",
+  "score": 1.0,
+  "heard": "It copies voices. It copied mine. Don't answer it when it calls the third time.",
+  "match": 1.0,
+  "f0": 228,
+  "pace": 2.93
+ },
+ "qrz2hw": {
+  "role": "kabir",
+  "style": "phone",
+  "text": "Aditi? It's two in the morning. What happened?",
+  "score": 1.0,
+  "heard": "Aditi, it's two in the morning. What happened?",
+  "match": 1.0,
+  "f0": 102,
+  "pace": 2.68
+ },
+ "beuhhd": {
+  "role": "aditi",
+  "style": "speak",
+  "text": "It's her, Kabir. Ma's voice, on a tape. She says she's at Nishipur Junction. I'm going tonight.",
+  "score": 0.94,
+  "heard": "It's her, Kabir. Ma's voice, on a tape, she says she's at Nicheper Junction, I'm going tonight.",
+  "match": 0.94,
+  "f0": 204,
+  "pace": 2.93
+ },
+ "u8072h": {
+  "role": "kabir",
+  "style": "phone",
+  "text": "Then I'm driving you. I'll wait in the car outside with the radio on. No arguments.",
+  "score": 1.0,
+  "heard": "Then I'm driving you. I'll wait in the car outside with the radio on. No arguments.",
+  "match": 1.0,
+  "f0": 90,
+  "pace": 3.1
+ },
+ "1aqmhnr": {
+  "role": "aditi",
+  "style": "speak",
+  "text": "Okay. Thank you, Kabir.",
+  "score": 1.0,
+  "heard": "Okay, thank you, Kabir.",
+  "match": 1.0,
+  "f0": 192,
+  "pace": 2.04
+ },
+ "1h2zpuq": {
+  "role": "booth",
+  "style": "tape",
+  "text": "I am still in the booth.",
+  "score": 1.0,
+  "heard": "I am still in the booth.",
+  "match": 1.0,
+  "f0": 108,
+  "pace": 3.97
+ },
+ "1jkm25z": {
+  "role": "mother",
+  "style": "phone",
+  "text": "Aditi? Is that you? Don't come to the platform...",
+  "score": 0.84,
+  "heard": "A DD. Is that you? Don't come to the platform.",
+  "match": 0.84,
+  "f0": 246,
+  "pace": 3.0
+ },
+ "7wnpfw": {
+  "role": "kabir",
+  "style": "radio",
+  "text": "Aditi, radio check. I'm right outside in the car. The gate shut behind you the second you went in, and I can't move it from here.",
+  "score": 0.94,
+  "heard": "A DD radio check. I'm right outside, in the car. The gate shut behind you the second you went in. And I can't move it from here.",
+  "match": 0.94,
+  "f0": 97,
+  "pace": 3.3
+ },
+ "amc0tx": {
+  "role": "kabir",
+  "style": "radio",
+  "text": "Your mother's unit hid three reels in there. Find them, get the power back, and the gate motor should answer. Torch first: there's an emergency kit on the bench right by you. And don't trust the announcements.",
+  "score": 1.0,
+  "heard": "Your mother's unit hid three reels in there. Find them, get the power back, and the gate motor should answer. Torch first. There's an emergency kit on the bench right by you. And don't trust the announcements.",
+  "match": 1.0,
+  "f0": 97,
+  "pace": 2.87
+ },
+ "ltqtbl": {
+  "role": "kabir",
+  "style": "radio",
+  "text": "I can see your light through the gate. Now the station master's office: green door, middle of the building. He kept a logbook, and the maintenance key.",
+  "score": 1.0,
+  "heard": "I can see your light through the gate. Now the station master's office, green door, middle of the building. He kept a logbook and the maintenance key.",
+  "match": 1.0,
+  "f0": 93,
+  "pace": 2.9
+ },
+ "1wt59uw": {
+  "role": "kabir",
+  "style": "radio",
+  "text": "Keep that logbook in your head: the fuse ratings are in it. First the three reels. They hiss when you're close.",
+  "score": 1.0,
+  "heard": "Keep that logbook in your head. The fuse ratings are in it. First the three reels. They hiss when you're close.",
+  "match": 1.0,
+  "f0": 96,
+  "pace": 3.08
+ },
+ "sw12if": {
+  "role": "kabir",
+  "style": "radio",
+  "text": "The lights just came on out here too. Listen to the announcement: it gives the order of the reels. If you miss it, the console in the signal room plays it again.",
+  "score": 1.0,
+  "heard": "The lights just came on out here too. Listen to the announcement, it gives the order of the reels. If you miss it, the console in the signal room plays it again.",
+  "match": 1.0,
+  "f0": 100,
+  "pace": 3.42
+ },
+ "1c5ideo": {
+  "role": "kabir",
+  "style": "radio",
+  "text": "The gate motor is live. Open it and run. I've got the car door open. Don't stop on the platform.",
+  "score": 1.0,
+  "heard": "The gate motor is live, open it and run. I've got the car door open, don't stop on the platform.",
+  "match": 1.0,
+  "f0": 100,
+  "pace": 3.47
+ },
+ "1x3dsrf": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "It's so cold in here. I can see my breath.",
+  "score": 0.95,
+  "heard": "So cold in here, I can see my breath.",
+  "match": 0.95,
+  "f0": null,
+  "pace": 3.76
+ },
+ "14ph6r1": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Nobody has been here in years. So why does it smell of smoke?",
+  "score": 1.0,
+  "heard": "Nobody has been here in years, so why does it smell of smoke?",
+  "match": 1.0,
+  "f0": null,
+  "pace": 3.3
+ },
+ "1t4qb9e": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Hello? ...No. Don't call out, Aditi.",
+  "score": 0.77,
+  "heard": "Hello, no, don't call out at it.",
+  "match": 0.77,
+  "f0": null,
+  "pace": 2.63
+ },
+ "1cl61ra": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Ma walked on these same tiles. Twenty-seven years ago.",
+  "score": 0.84,
+  "heard": "Ma walked on these same tiles 27 years ago.",
+  "match": 0.84,
+  "f0": null,
+  "pace": 2.8
+ },
+ "nuf0wr": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "That's just the wind. It's just the wind.",
+  "score": 1.0,
+  "heard": "That's just the wind. It's just the wind.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 3.02
+ },
+ "c5w2yw": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Keep moving. Kabir is right outside.",
+  "score": 1.0,
+  "heard": "Keep moving. Kabir is right outside.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 2.42
+ },
+ "10ye726": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Why does every clock here stop at three thirteen?",
+  "score": 0.82,
+  "heard": "Why does every clock here stop at 313?",
+  "match": 0.82,
+  "f0": null,
+  "pace": 2.71
+ },
+ "1lcgpq9": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Thakuma said never answer a voice at night. Not until the third time.",
+  "score": 0.89,
+  "heard": "The Kuma said never answer a voice at night, not until the third time.",
+  "match": 0.89,
+  "f0": null,
+  "pace": 2.91
+ },
+ "1nco2oc": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Somebody was sitting here. The dust is still warm.",
+  "score": 1.0,
+  "heard": "Somebody was sitting here, the dust is still warm.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 2.78
+ },
+ "c37vy4": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Ma's torch. It still works. Of course it does.",
+  "score": 0.89,
+  "heard": "Must torch it still works, of course it does.",
+  "match": 0.89,
+  "f0": null,
+  "pace": 3.07
+ },
+ "flef6o": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Three reels, three numbers. Okay. I can do this.",
+  "score": 1.0,
+  "heard": "Three reels, three numbers. Okay, I can do this.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 2.92
+ },
+ "wb289b": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "That's all three. Now the power.",
+  "score": 1.0,
+  "heard": "That's all three now, the power.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 2.84
+ },
+ "3m9h5p": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Light. Finally. Now I just have to listen.",
+  "score": 1.0,
+  "heard": "Light finally, now I just have to listen.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 2.86
+ },
+ "14mmb4e": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "That was her voice. Ma...",
+  "score": 1.0,
+  "heard": "That was her voice, Ma.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 2.53
+ },
+ "hglxwi": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Run. Don't look back.",
+  "score": 1.0,
+  "heard": "Run, don't look back.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 2.15
+ },
+ "187q6wq": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Ma...? No. Ma isn't here.",
+  "score": 1.0,
+  "heard": "Ma, no, Ma, isn't here.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 2.51
+ },
+ "edt152": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "Thakuma said it can only call twice. Only twice.",
+  "score": 0.84,
+  "heard": "The kuma said it can only call twice, only twice.",
+  "match": 0.84,
+  "f0": null,
+  "pace": 2.85
+ },
+ "1c902dc": {
+  "role": "aditi",
+  "style": "thought",
+  "text": "I didn't turn. It was never her.",
+  "score": 1.0,
+  "heard": "I didn't turn, it was never her.",
+  "match": 1.0,
+  "f0": null,
+  "pace": 3.33
+ },
+ "ttqiq9": {
+  "role": "mother",
+  "style": "call",
+  "text": "Aditi?",
+  "score": 0.2,
+  "heard": "Aditi?",
+  "match": 1.0,
+  "f0": 262,
+  "pace": 0.62
+ },
+ "v7lar8": {
+  "role": "mother",
+  "style": "call",
+  "text": "Aditi... shona, it's me.",
+  "score": 1.0,
+  "heard": "Aditi, Shona, it's me.",
+  "match": 1.0,
+  "f0": 233,
+  "pace": 1.72
+ },
+ "xzkk4u": {
+  "role": "mother",
+  "style": "caller",
+  "text": "Aditi.",
+  "score": 0.7,
+  "heard": "Aditi.",
+  "match": 1.0,
+  "f0": 243,
+  "pace": 0.61
+ },
+ "ymai59": {
+  "role": "mother",
+  "style": "note",
+  "text": "Three reels. Three numbers. Do not let it call a third time.",
+  "score": 1.0,
+  "heard": "Three reels, three numbers. Do not let it call a third time.",
+  "match": 1.0,
+  "f0": 242,
+  "pace": 2.97
+ },
+ "bueuwd": {
+  "role": "mother",
+  "style": "tape",
+  "text": "If you are hearing this, I kept it busy long enough. Now finish it, Aditi.",
+  "score": 0.93,
+  "heard": "If you are hearing this, I kept it busy long enough. Now finish it, Additi.",
+  "match": 0.93,
+  "f0": 252,
+  "pace": 3.15
+ },
+ "an7tms": {
+  "role": "mother",
+  "style": "pa",
+  "text": "Go. Now. Don't look back for me.",
+  "score": 1.0,
+  "heard": "Go, now. Don't look back for me.",
+  "match": 1.0,
+  "f0": 227,
+  "pace": 3.12
+ },
+ "7gsnq6": {
+  "role": "announcer",
+  "style": "pa",
+  "text": "Attention please... the 3:13 local to... ... has been... cancelled. Passengers are requested to remain where they can be heard.",
+  "score": 0.87,
+  "heard": "Attention please, the 313 local 2 has been cancelled. Passengers are requested to remain where they can be heard.",
+  "match": 0.87,
+  "f0": 284,
+  "pace": 2.25
+ },
+ "1vk2tce": {
+  "role": "announcer",
+  "style": "pa",
+  "text": "Platform Zero... Platform Zero... somebody is waiting for you on Platform Zero.",
+  "score": 0.75,
+  "heard": "Platform 0, Platform 0, somebody is waiting for you on Platform 0.",
+  "match": 0.75,
+  "f0": 282,
+  "pace": 2.24
+ },
+ "dv4fld": {
+  "role": "announcer",
+  "style": "pa",
+  "text": "We regret to inform you that the last train has already left. We regret to inform you. We regret.",
+  "score": 1.0,
+  "heard": "We regret to inform you that the last train has already left. We regret to inform you. We regret.",
+  "match": 1.0,
+  "f0": 277,
+  "pace": 2.93
+ },
+ "12ivbpb": {
+  "role": "announcer",
+  "style": "pa",
+  "text": "This is the third call. This is the third call.",
+  "score": 0.5,
+  "heard": "This is the third call. This is the third call.",
+  "match": 1.0,
+  "f0": 299,
+  "pace": 3.14
+ },
+ "a7x8ty": {
+  "role": "announcer",
+  "style": "pa",
+  "text": "Incorrect. Incorrect. Please wait where you are.",
+  "score": 1.0,
+  "heard": "Incorrect. Incorrect. Please wait where you are.",
+  "match": 1.0,
+  "f0": 289,
+  "pace": 2.03
+ },
+ "18olo44": {
+  "role": "announcer",
+  "style": "pa",
+  "text": "Platform Zero is now closed. Thank you for travelling with us.",
+  "score": 0.91,
+  "heard": "Platform 0 is now closed. Thank you for travelling with us.",
+  "match": 0.91,
+  "f0": 286,
+  "pace": 2.56
+ }
+}

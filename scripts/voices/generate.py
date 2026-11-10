@@ -43,8 +43,9 @@ CAST = {
                       "Okay. Breathe. Just breathe... it's only the wind. Keep going, Aditi. Keep going."),
     "mother": ("female, middle-aged, low pitch, indian accent",
                "Aditi, listen to me, shona. I don't have much time... I love you. Whatever you hear tonight, don't answer it."),
-    "mother_whisper": ("female, middle-aged, low pitch, whisper, indian accent",
-                       "Aditi... come here, shona. Come closer. I'm right behind you."),
+    # ("low pitch" with "whisper" makes the model return noise)
+    "mother_whisper": ("female, middle-aged, whisper, indian accent",
+                       "Aditi, come here, shona. Come closer. I'm right behind you."),
     "kabir": ("male, young adult, low pitch, indian accent",
               "Hey, hey. It's okay. I'm right here, alright? I'm not going anywhere. Just keep talking to me."),
     "announcer": ("female, middle-aged, moderate pitch, indian accent",
@@ -153,8 +154,12 @@ PITCH = {"aditi": (165, 300), "mother": (140, 255), "kabir": (80, 160), "announc
 TRIES = 5
 
 
+DIGITS = dict(zip("0123456789", ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]))
+
+
 def words(t):
-    return re.sub(r"[^a-z0-9' ]+", " ", t.lower().replace("’", "'")).split()
+    t = re.sub(r"\d", lambda m: f" {DIGITS[m.group()]} ", t.lower().replace("’", "'"))
+    return re.sub(r"[^a-z' ]+", " ", t).split()
 
 
 class Judge:
@@ -177,7 +182,9 @@ class Judge:
             ok_pitch = lo <= f0 <= hi
         secs = len(y) / 16000
         pace = len(words(text)) / max(secs, 0.1)
-        score = match - (0 if ok_pitch else 0.5) - (0 if 0.8 <= pace <= 4.8 else 0.3)
+        # (a one- or two-word call is meant to be drawn out: no pace check)
+        paced = len(words(text)) <= 2 or 0.8 <= pace <= 4.8
+        score = match - (0 if ok_pitch else 0.5) - (0 if paced else 0.3)
         return score, {"heard": heard.strip(), "match": round(match, 2), "f0": f0 and round(f0), "pace": round(pace, 2)}
 
 
