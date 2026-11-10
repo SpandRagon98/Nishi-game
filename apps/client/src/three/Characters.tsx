@@ -6,6 +6,10 @@ import { fx, now } from '../game/fx';
 import { runtime } from '../game/runtime';
 import { CallerFigure, type GhostControl } from './Ghost';
 
+/** eases angle `a` towards `b` the short way round (yaw wraps at ±π; a plain lerp spins her a full turn) */
+const turn = (a: number, b: number, k: number) => a + (THREE.MathUtils.euclideanModulo(b - a + Math.PI, Math.PI * 2) - Math.PI) * k;
+const tmpTarget = new THREE.Vector3();
+
 export interface AnimState {
   speed: number;
   crouch: boolean;
@@ -190,10 +194,10 @@ export function GhostActor() {
     // before a hunt it surfaces as a faint, slowly breathing shape rather than a strobe
     const warn = g.mode === 'warn' && !g.visible;
     grp.visible = g.visible || warn;
-    const target = new THREE.Vector3(g.pos.x, g.pos.y, g.pos.z);
+    const target = tmpTarget.set(g.pos.x, g.pos.y, g.pos.z);
     if (grp.position.distanceTo(target) > 4) grp.position.copy(target);
     else grp.position.lerp(target, Math.min(1, dt * 10));
-    grp.rotation.y = THREE.MathUtils.lerp(grp.rotation.y, g.yaw + Math.PI, Math.min(1, dt * 8));
+    grp.rotation.y = turn(grp.rotation.y, g.yaw + Math.PI, Math.min(1, dt * 8));
     const c = control.current;
     // testing Studio: the panel's sliders pose the pinned Caller
     const pose = import.meta.env.DEV && runtime.debugCaller ? runtime.studio.ghost : null;
@@ -289,12 +293,12 @@ function RemoteSurvivor({ id, ghostVision }: { id: string; ghostVision: boolean 
     const g = group.current;
     if (!s || !g) return;
     g.visible = !s.hiding && s.status !== 'captured' && s.status !== 'escaped';
-    const target = new THREE.Vector3(s.pos.x, s.pos.y, s.pos.z);
+    const target = tmpTarget.set(s.pos.x, s.pos.y, s.pos.z);
     if (!init.current || g.position.distanceTo(target) > 5) {
       g.position.copy(target);
       init.current = true;
     } else g.position.lerp(target, Math.min(1, dt * 12)); // interpolate between 15 Hz server updates
-    g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, s.yaw + Math.PI, Math.min(1, dt * 10));
+    g.rotation.y = turn(g.rotation.y, s.yaw + Math.PI, Math.min(1, dt * 10));
     anim.current.speed = dt > 0 ? Math.min(6, last.current.distanceTo(g.position) / dt) : 0;
     anim.current.crouch = !!(s.flags & FLAG_CROUCH);
     anim.current.down = s.status === 'downed';

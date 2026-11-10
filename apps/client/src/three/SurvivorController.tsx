@@ -185,6 +185,8 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     const alive = me.status === 'alive';
     const hiding = me.hiding ? level.hidingSpots.find((h) => h.id === me.hiding) : undefined;
     const t = b.translation();
+    // where the body will be after this frame's step: the camera goes there now, not a frame late
+    // (a frame late, every uneven frame time shows as a stutter in the view)
     const feet: Vec3 = { x: t.x, y: t.y - CENTER, z: t.z };
     let flags = 0;
     let moving = false;
@@ -221,6 +223,9 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
       const mv = ctrl.computedMovement();
       if (ctrl.computedGrounded() && s.vy < 0) s.vy = -0.5;
       b.setNextKinematicTranslation({ x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z });
+      feet.x += mv.x;
+      feet.y += mv.y;
+      feet.z += mv.z;
       const horiz = Math.hypot(mv.x, mv.z);
       s.stride += horiz;
       s.bob += horiz * (sprinting ? 2.2 : 2.6);

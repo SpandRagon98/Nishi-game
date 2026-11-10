@@ -20,7 +20,11 @@ export function TouchControls() {
   const ability = useApp((s) => s.hud.abilityName);
   const cooldown = useApp((s) => Math.ceil(s.hud.abilityLeft));
   const overlay = useApp((s) => s.overlay);
-  const [knob, setKnob] = useState<{ ox: number; oy: number; x: number; y: number } | null>(null);
+  // where the thumb landed; the knob itself moves without a React render (one per touch move would
+  // compete with the game's frame on a phone)
+  const [knob, setKnob] = useState<{ ox: number; oy: number } | null>(null);
+  const stickEl = useRef<HTMLDivElement>(null);
+  const knobEl = useRef<HTMLDivElement>(null);
   const [crouch, setCrouch] = useState(false);
   const t = useRef({ move: -1, look: -1, ox: 0, oy: 0, lx: 0, ly: 0 });
 
@@ -55,7 +59,7 @@ export function TouchControls() {
         r.move = p.identifier;
         r.ox = p.clientX;
         r.oy = p.clientY;
-        setKnob({ ox: p.clientX, oy: p.clientY, x: 0, y: 0 });
+        setKnob({ ox: p.clientX, oy: p.clientY });
       } else if (r.look < 0) {
         r.look = p.identifier;
         r.lx = p.clientX;
@@ -78,7 +82,8 @@ export function TouchControls() {
         const live = d > RADIUS * 0.2;
         stick.x = live ? dx / RADIUS : 0;
         stick.y = live ? dy / RADIUS : 0;
-        setKnob({ ox: r.ox, oy: r.oy, x: dx, y: dy });
+        if (knobEl.current) knobEl.current.style.transform = `translate(${dx}px, ${dy}px)`;
+        stickEl.current?.classList.toggle('sprint', d > RADIUS * 0.92);
       } else if (p.identifier === r.look) {
         mouse.dx += (p.clientX - r.lx) * LOOK;
         mouse.dy += (p.clientY - r.ly) * LOOK;
@@ -113,12 +118,11 @@ export function TouchControls() {
 
   if (covered) return null;
   const journal = overlay === 'journal';
-  const sprint = knob ? Math.hypot(knob.x, knob.y) > RADIUS * 0.92 : false;
   return (
     <div className={`touch-pad${journal ? ' journal-open' : ''}`} onTouchStart={start} onTouchMove={move} onTouchEnd={end} onTouchCancel={end}>
       {knob && (
-        <div className={`stick${sprint ? ' sprint' : ''}`} style={{ left: knob.ox, top: knob.oy }}>
-          <div className="stick-knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
+        <div ref={stickEl} className="stick" style={{ left: knob.ox, top: knob.oy }}>
+          <div ref={knobEl} className="stick-knob" />
         </div>
       )}
       {!knob && !journal && <div className="stick-hint">Move</div>}

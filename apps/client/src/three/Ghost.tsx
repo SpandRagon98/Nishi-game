@@ -10,7 +10,7 @@ import { now } from '../game/fx';
  * shoulder), long wet black hair hanging in clumps over a grey face, thin bare arms with old bangles,
  * long fingers and bare feet. She is built on a real skeleton (hips, spine, neck, a jaw that drops open,
  * shoulders, elbows, wrists, fingers, knees, ankles), so she walks, limps, runs hunched, lunges with
- * her arms out and screams. Procedural, no assets: five draw calls per figure.
+ * her arms out and screams. Procedural, no assets: four draw calls per figure.
  */
 export interface GhostControl {
   opacity: number;
@@ -58,12 +58,12 @@ function skinShader(m: THREE.MeshStandardMaterial, u: U) {
         '#include <map_fragment>',
         `#include <map_fragment>
 float mott = gNoise(vBody.xy * 46.0 + vBody.z * 23.0) * 0.6 + gNoise(vBody.zy * 11.0) * 0.4;
-float vn = gNoise(vBody.xy * 17.0 + vec2(vBody.z * 13.0, 0.0));
-float vein = 1.0 - smoothstep(0.0, 0.045, abs(vn - 0.5));
-diffuseColor.rgb *= mix(0.78, 1.08, mott);
-diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.13, 0.17), vein * 0.38);`,
+float vn = gNoise(vBody.xy * 23.0 + vec2(vBody.z * 19.0, 0.0)) + 0.35 * gNoise(vBody.zy * 61.0);
+float vein = (1.0 - smoothstep(0.0, 0.02, abs(vn - 0.68))) * smoothstep(0.35, 0.7, gNoise(vBody.xz * 9.0 + 3.1));
+diffuseColor.rgb *= mix(0.8, 1.06, mott);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.24, 0.3), vein * 0.22);`,
       )
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor *= mix(0.55, 1.25, mott);');
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor *= mix(0.7, 1.2, mott);');
   };
 }
 
@@ -107,7 +107,14 @@ if (hole > 0.88 && vH < vHem + 0.45) discard;
 diffuseColor.rgb *= mix(0.6, 1.0, gNoise(vec2(vAng * 4.0, vH * 5.0)));
 // mud and old blood soaked up from the floor; damp, darker patches higher up
 diffuseColor.rgb *= mix(vec3(0.3, 0.27, 0.23), vec3(1.0), smoothstep(vHem, vHem + 0.5, vH));
-diffuseColor.rgb *= mix(0.72, 1.0, smoothstep(0.35, 0.62, gNoise(vec2(vAng * 2.5, vH * 3.0))));`,
+diffuseColor.rgb *= mix(0.72, 1.0, smoothstep(0.35, 0.62, gNoise(vec2(vAng * 2.5, vH * 3.0))));
+// the skirt: a fan of pleats down the front, and the tuck where it is gathered in at the waist
+float sk = step(0.0, vHem) * step(vHem, 0.1);
+float pf = sk * (1.0 - smoothstep(0.14, 0.32, abs(vAng - 1.5708))) * (1.0 - smoothstep(0.86, 0.98, vH));
+diffuseColor.rgb *= 1.0 - pf * 0.4 * pow(0.5 + 0.5 * cos(vAng * 70.0), 4.0);
+diffuseColor.rgb *= 1.0 - sk * 0.3 * smoothstep(0.95, 1.0, vH);
+// the blouse's hem under the wrap
+diffuseColor.rgb *= 1.0 - step(vHem, -0.5) * 0.28 * exp(-pow((vH - 1.19) / 0.008, 2.0));`,
       );
   };
 }
@@ -136,8 +143,11 @@ transformed = aRoot + rel;
 transformed.x += sin(uTime * 0.85 + aPhase) * k * 0.03;
 transformed.z += (cos(uTime * 0.7 + aPhase * 1.3) * 0.025 - uSpeed * 0.3) * k;`,
       );
-    // the under layers and the roots sit in their own shadow, highlights included
-    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', 'outgoingLight *= vColor.rgb;\n#include <opaque_fragment>');
+    // the under layers and the roots sit in their own shadow, highlights included; and black hair
+    // stays black under a torch: a thin wet sheen, not a mirror
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.directSpecular = min(reflectedLight.directSpecular * 0.5, vec3(0.02));\nreflectedLight.indirectSpecular *= 0.2;')
+      .replace('#include <opaque_fragment>', 'outgoingLight *= vColor.rgb;\n#include <opaque_fragment>');
   };
 }
 
@@ -261,84 +271,174 @@ const torsoW = (p: THREE.Vector3): W => {
 };
 
 const HEAD_C = new THREE.Vector3(0, 1.685, 0.014);
-const HEAD_S = new THREE.Vector3(0.079, 0.114, 0.097);
-/** a point on the unit head, in body space */
-const headAt = (x: number, y: number, z: number) => new THREE.Vector3(x * HEAD_S.x + HEAD_C.x, y * HEAD_S.y + HEAD_C.y, z * HEAD_S.z + HEAD_C.z);
+/** half-extents of the shell the hair lies on: it has to clear the sculpted cranium (headSdf) everywhere */
+const HEAD_S = new THREE.Vector3(0.079, 0.12, 0.105);
+/** a point on the face, in metres from the middle of the head */
+const F = (x: number, y: number, z: number) => new THREE.Vector3(x + HEAD_C.x, y + HEAD_C.y, z + HEAD_C.z);
+
+// landmarks of the face, metres from the middle of the head (+z forward, she looks down +z)
+const EYE = { x: 0.031, y: 0.005, z: 0.056, r: 0.011 };
+const MOUTH_Y = -0.0625;
+const MOUTH_W = 0.0235;
+
+// ── signed distances (metres): the head is sculpted as one smooth surface ──
+const sdEll = (x: number, y: number, z: number, cx: number, cy: number, cz: number, rx: number, ry: number, rz: number) => {
+  const px = (x - cx) / rx;
+  const py = (y - cy) / ry;
+  const pz = (z - cz) / rz;
+  const k0 = Math.hypot(px, py, pz);
+  const k1 = Math.hypot(px / rx, py / ry, pz / rz);
+  return (k0 * (k0 - 1)) / Math.max(k1, 1e-6);
+};
+const sdCap = (x: number, y: number, z: number, ax: number, ay: number, az: number, bx: number, by: number, bz: number, r: number) => {
+  const pax = x - ax, pay = y - ay, paz = z - az;
+  const bax = bx - ax, bay = by - ay, baz = bz - az;
+  const h = THREE.MathUtils.clamp((pax * bax + pay * bay + paz * baz) / (bax * bax + bay * bay + baz * baz), 0, 1);
+  return Math.hypot(pax - bax * h, pay - bay * h, paz - baz * h) - r;
+};
+const smin = (a: number, b: number, k: number) => {
+  const h = THREE.MathUtils.clamp(0.5 + (0.5 * (b - a)) / k, 0, 1);
+  return b + (a - b) * h - k * h * (1 - h);
+};
+const smax = (a: number, b: number, k: number) => -smin(-a, -b, k);
 
 /**
- * The face, from a sphere: a long skull, deep eye sockets under a brow, a thin nose, high cheekbones
- * over hollow cheeks, thin lips and a narrow chin. The mouth is a real slit: everything below it is
- * carried by the jaw, so when the jaw drops the mouth tears open into the dark behind it.
+ * A gaunt woman's head: a long skull, a narrow jaw and small chin, high cheekbones over hollow
+ * cheeks, a brow over deep sockets, a thin straight nose with nostril wings, and thin lips.
+ */
+function headSdf(x: number, y: number, z: number) {
+  const ax = Math.abs(x);
+  let d = sdEll(x, y, z, 0, 0.028, -0.016, 0.07, 0.088, 0.092); // cranium
+  d = smin(d, sdEll(x, y, z, 0, -0.03, 0.022, 0.06, 0.068, 0.064), 0.03); // the face
+  d = smin(d, sdEll(x, y, z, 0, -0.068, 0.012, 0.05, 0.042, 0.07), 0.025); // jaw
+  d = smin(d, sdEll(x, y, z, 0, -0.094, 0.058, 0.021, 0.018, 0.02), 0.015); // chin
+  d = smin(d, sdEll(ax, y, z, 0.043, -0.004, 0.052, 0.019, 0.012, 0.02), 0.012); // cheekbones
+  d = smin(d, sdCap(ax, y, z, 0.006, 0.022, 0.079, 0.026, 0.027, 0.077, 0.0055), 0.01); // brows, arching
+  d = smin(d, sdCap(ax, y, z, 0.026, 0.027, 0.077, 0.047, 0.022, 0.066, 0.005), 0.01);
+  d = smin(d, sdCap(x, y, z, 0, 0.01, 0.077, 0, -0.025, 0.097, 0.0058), 0.008); // bridge of the nose
+  d = smin(d, Math.hypot(x, y + 0.029, z - 0.097) - 0.0095, 0.006); // its tip
+  d = smin(d, Math.hypot(ax - 0.011, y + 0.033, z - 0.088) - 0.0068, 0.005); // nostril wings
+  d = smin(d, sdCap(x, y, z, -0.019, -0.0575, 0.0835, 0.019, -0.0575, 0.0835, 0.0055), 0.006); // upper lip
+  d = smin(d, sdCap(x, y, z, -0.017, -0.067, 0.0815, 0.017, -0.067, 0.0815, 0.006), 0.006); // lower lip
+  d = smax(d, -sdEll(ax, y, z, EYE.x, EYE.y, 0.073, 0.019, 0.0135, 0.016), 0.008); // eye sockets
+  d = smin(d, Math.hypot(ax - EYE.x, y - EYE.y, z - EYE.z) - (EYE.r + 0.0012), 0.004); // lids over the eyeballs
+  // the opening between the lids: a narrow almond, tilted up at the outer corner
+  const ex = ax - EYE.x;
+  d = smax(d, -sdEll(ax, y - ex * 0.12, z, EYE.x + 0.001, EYE.y - 0.0008, EYE.z + EYE.r, 0.0115, 0.0042, 0.0062), 0.0015);
+  d = smax(d, -sdEll(ax, y, z, 0.05, -0.045, 0.066, 0.016, 0.02, 0.013), 0.012); // hollow cheeks
+  return d;
+}
+
+/**
+ * The head: a sphere grid, densest across the face, each vertex pushed out along its ray onto the
+ * sculpted surface. The mouth is a real slit: everything below it is carried by the jaw, so when the
+ * jaw drops the mouth tears open into the dark behind it. Creases and hollows are shaded darker.
  */
 function headGeometry() {
-  const WS = 48;
-  const HS = 36;
-  const g = new THREE.SphereGeometry(1, WS, HS);
-  const p = g.attributes.position as THREE.BufferAttribute;
-  const orig = p.clone();
-  const MOUTH = 24; // first row of the jaw: the slit opens between rows 23 and 24 (y ≈ -0.5)
-  const shade: number[] = [];
+  const WS = 96;
+  const HS = 72;
+  const pos: number[] = [];
+  const shade: [number, number, number][] = [];
   const jawW: number[] = [];
-  const blob = (x: number, y: number, cx: number, cy: number, r: number) => Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (r * r));
-  const v = new THREE.Vector3();
-  for (let i = 0; i < p.count; i++) {
-    v.fromBufferAttribute(p, i);
-    const row = Math.floor(i / (WS + 1));
-    const { x, y, z } = v;
-    const ax = Math.abs(x);
-    const front = sstep(0.25, 0.8, z);
-    const socket = blob(ax, y, 0.35, 0.08, 0.19) * front;
-    const brow = Math.exp(-(((y - 0.27) / 0.075) ** 2)) * (1 - sstep(0.32, 0.62, ax)) * front;
-    const nose = Math.exp(-((x / 0.075) ** 2)) * sstep(0.2, -0.18, y) * sstep(-0.34, -0.22, y) * front;
-    const nostril = blob(ax, y, 0.075, -0.27, 0.06) * front;
-    const cheekbone = blob(ax, y, 0.56, -0.02, 0.17) * sstep(0.0, 0.5, z);
-    const hollow = blob(ax, y, 0.52, -0.4, 0.2) * sstep(-0.1, 0.6, z);
-    const upperLip = Math.exp(-(((y + 0.45) / 0.05) ** 2)) * Math.exp(-((x / 0.3) ** 2)) * front;
-    const lowerLip = Math.exp(-(((y + 0.6) / 0.05) ** 2)) * Math.exp(-((x / 0.27) ** 2)) * front;
-    const chin = blob(x, y, 0, -0.84, 0.2) * front;
-    // skull: fuller at the top and back, narrowing hard to a small jaw
-    v.x *= 1 + 0.05 * sstep(0.1, 0.8, y) - 0.3 * sstep(-0.05, -0.95, y);
-    v.z *= 1 + 0.07 * sstep(0, -1, z) * sstep(-0.3, 0.6, y);
-    v.multiplyScalar(1 + 0.04 * cheekbone - 0.1 * hollow);
-    v.z += 0.05 * brow - 0.17 * socket + 0.17 * nose + 0.03 * nostril + 0.03 * upperLip + 0.02 * lowerLip + 0.04 * chin;
-    p.setXYZ(i, v.x, v.y, v.z);
-    const slit = row >= MOUTH - 1 && row <= MOUTH && orig.getZ(i) > 0.6 && Math.abs(orig.getX(i)) < 0.33 ? 1 : 0;
-    shade.push(1 - 0.8 * socket - 0.3 * hollow - 0.25 * nostril - 0.5 * slit + 0.08 * cheekbone);
-    jawW.push(row >= MOUTH ? sstep(-0.4, 0.25, orig.getZ(i)) : 0);
-  }
-  // the slit: no faces between the lips across the front of the mouth
-  const idx: number[] = [];
-  const grid = (ix: number, iy: number) => iy * (WS + 1) + ix;
-  const inMouth = (k: number) => orig.getZ(k) > 0.6 && Math.abs(orig.getX(k)) < 0.33;
-  for (let iy = 0; iy < HS; iy++) {
-    for (let ix = 0; ix < WS; ix++) {
-      const a = grid(ix + 1, iy);
-      const b = grid(ix, iy);
-      const c = grid(ix, iy + 1);
-      const d = grid(ix + 1, iy + 1);
-      if (iy === MOUTH - 1 && [a, b, c, d].every(inMouth)) continue;
-      if (iy !== 0) idx.push(a, b, d);
-      if (iy !== HS - 1) idx.push(b, c, d);
+  const slit: boolean[] = [];
+  const grad = (x: number, y: number, z: number) => {
+    const e = 0.0005;
+    return new THREE.Vector3(
+      headSdf(x + e, y, z) - headSdf(x - e, y, z),
+      headSdf(x, y + e, z) - headSdf(x, y - e, z),
+      headSdf(x, y, z + e) - headSdf(x, y, z - e),
+    ).normalize();
+  };
+  for (let j = 0; j <= HS; j++) {
+    const el = Math.PI / 2 - (j / HS) * Math.PI;
+    for (let i = 0; i <= WS; i++) {
+      // more columns across the face than round the back
+      const s = (i / WS) * 2 - 1;
+      const az = Math.PI * (0.55 * s + 0.45 * s * s * s);
+      const dx = Math.cos(el) * Math.sin(az);
+      const dy = Math.sin(el);
+      const dz = Math.cos(el) * Math.cos(az);
+      // march out to the surface, then halve the step down to it
+      let lo = 0.04;
+      let hi = lo;
+      while (hi < 0.2 && headSdf(dx * hi, dy * hi, dz * hi) < 0) {
+        lo = hi;
+        hi += 0.005;
+      }
+      for (let k = 0; k < 14; k++) {
+        const m = (lo + hi) / 2;
+        if (headSdf(dx * m, dy * m, dz * m) < 0) lo = m;
+        else hi = m;
+      }
+      const t = (lo + hi) / 2;
+      const x = dx * t;
+      const y = dy * t;
+      const z = dz * t;
+      pos.push(x, y, z);
+      // how enclosed the point is: sockets, creases and hollows sit in their own shadow
+      const n = grad(x, y, z);
+      const ao = THREE.MathUtils.clamp(headSdf(x + n.x * 0.008, y + n.y * 0.008, z + n.z * 0.008) / 0.008, 0, 1);
+      const lip = Math.max(0, 1 - Math.min(
+        sdCap(x, y, z, -0.019, -0.0575, 0.0835, 0.019, -0.0575, 0.0835, 0.0055),
+        sdCap(x, y, z, -0.017, -0.067, 0.0815, 0.017, -0.067, 0.0815, 0.006),
+      ) / 0.004) * sstep(0.07, 0.08, z);
+      // dark, bruised skin round the eyes
+      const ring = Math.exp(-((Math.hypot(Math.abs(x) - EYE.x, (y - EYE.y) * 1.3) / 0.022) ** 2)) * sstep(0.03, 0.06, z);
+      const c = (0.42 + 0.58 * ao) * (1 - 0.2 * ring);
+      shade.push([c * (1 - 0.12 * lip), c * (1 - 0.32 * lip), c * (1 - 0.14 * lip) * 1.03]);
+      const inMouth = Math.abs(x) < MOUTH_W && z > 0.06;
+      slit.push(inMouth);
+      jawW.push(inMouth ? (y < MOUTH_Y ? 1 : 0) : sstep(MOUTH_Y + 0.004, MOUTH_Y - 0.008, y) * sstep(-0.045, 0.0, z));
     }
   }
+  const at = (i: number, j: number) => j * (WS + 1) + i;
+  // closed lips: the rows either side of the line of the mouth meet on it, so at rest the mouth is
+  // a thin dark line (and still tears open when the jaw drops)
+  for (let i = 0; i <= WS; i++) {
+    for (let j = 0; j < HS; j++) {
+      const u = at(i, j);
+      const l = at(i, j + 1);
+      if (!slit[u] || !slit[l] || pos[u * 3 + 1] < MOUTH_Y || pos[l * 3 + 1] >= MOUTH_Y) continue;
+      const zc = Math.min(pos[u * 3 + 2], pos[l * 3 + 2]) - 0.001;
+      pos[u * 3 + 1] = MOUTH_Y + 1e-5;
+      pos[l * 3 + 1] = MOUTH_Y - 1e-5;
+      pos[u * 3 + 2] = pos[l * 3 + 2] = zc;
+    }
+  }
+  const idx: number[] = [];
+  // the slit: no faces across the line of the mouth between the lips
+  const cut = (a: number, b: number, c: number) => {
+    const v = [a, b, c];
+    if (!v.every((k) => slit[k])) return false;
+    const below = v.filter((k) => pos[k * 3 + 1] < MOUTH_Y).length;
+    return below > 0 && below < 3;
+  };
+  for (let j = 0; j < HS; j++) {
+    for (let i = 0; i < WS; i++) {
+      const a = at(i, j);
+      const b = at(i, j + 1);
+      const c = at(i + 1, j + 1);
+      const d = at(i + 1, j);
+      if (j !== 0 && !cut(a, b, d)) idx.push(a, b, d);
+      if (j !== HS - 1 && !cut(b, c, d)) idx.push(b, c, d);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
-  g.scale(HEAD_S.x, HEAD_S.y, HEAD_S.z);
   g.translate(HEAD_C.x, HEAD_C.y, HEAD_C.z);
   g.computeVertexNormals();
   let i = 0;
-  const w = jawW;
-  const s = shade;
+  let k = 0;
   return skin(g, () => {
-    const j = w[i];
+    const j = jawW[i++];
     return [['head', 1 - j], ['jaw', j]];
-  }, () => {
-    const c = s[i++];
-    return [c, c, c * 1.04];
-  });
+  }, () => shade[k++]);
 }
 
 /** everything she is made of, built once and shared by every figure */
-let built: { skin: THREE.BufferGeometry; cloth: THREE.BufferGeometry; detail: THREE.BufferGeometry; eyes: THREE.BufferGeometry; hair: THREE.BufferGeometry } | null = null;
+let built: { skin: THREE.BufferGeometry; cloth: THREE.BufferGeometry; eyes: THREE.BufferGeometry; hair: THREE.BufferGeometry } | null = null;
+const SKIN = '#97a0a3';
 function callerGeometry() {
   if (built) return built;
   const skinParts: THREE.BufferGeometry[] = [headGeometry()];
@@ -346,22 +446,65 @@ function callerGeometry() {
   const detail: THREE.BufferGeometry[] = [];
   const eyes: THREE.BufferGeometry[] = [];
 
-  // neck: long and slender, tendons standing out
-  const n0 = new THREE.Vector3(0, 1.425, -0.006);
-  const n1 = new THREE.Vector3(0, 1.64, 0.01);
-  skinParts.push(skin(limb(n0, n1, [[0.001, 0], [0.057, 0.02], [0.05, 0.18], [0.045, 0.5], [0.043, 0.8], [0.046, 0.96], [0.001, 1]], 16, 0.92), (p) => {
+  // neck: slender, leaning a little forward, the two long neck muscles standing out in a V
+  const n0 = new THREE.Vector3(0, 1.425, -0.012);
+  const n1 = new THREE.Vector3(0, 1.64, 0.0);
+  const neckW = (p: THREE.Vector3): W => {
     const t = (p.y - n0.y) / (n1.y - n0.y);
     const a = sstep(0.05, 0.3, t);
     const b = sstep(0.72, 0.95, t);
     return [['chest', 1 - a], ['neck', a * (1 - b)], ['head', a * b]];
-  }, (p) => 0.85 + 0.15 * sstep(-0.02, 0.03, p.z)));
-  // bare skin above the blouse, and the collarbones under it
-  const deco = new THREE.LatheGeometry([[0.001, 1.47], [0.06, 1.468], [0.12, 1.455], [0.15, 1.435], [0.155, 1.4]].map(([r, y]) => new THREE.Vector2(r, y)).reverse(), 32);
-  deco.scale(1, 1, 0.68);
-  deco.translate(0, 0, -0.008);
-  skinParts.push(skin(deco, torsoW));
+  };
+  skinParts.push(skin(limb(n0, n1, [[0.001, 0], [0.056, 0.02], [0.049, 0.18], [0.044, 0.5], [0.043, 0.8], [0.046, 0.96], [0.001, 1]], 20, 0.92), neckW, (p) => 0.82 + 0.18 * sstep(-0.02, 0.03, p.z)));
   for (const side of [1, -1]) {
-    skinParts.push(skin(limb(new THREE.Vector3(side * 0.02, 1.447, 0.082), new THREE.Vector3(side * 0.15, 1.458, 0.035), [[0.001, 0], [0.008, 0.08], [0.007, 0.5], [0.009, 0.92], [0.001, 1]], 6), 'chest'));
+    skinParts.push(skin(limb(new THREE.Vector3(side * 0.043, 1.645, -0.018), new THREE.Vector3(side * 0.012, 1.478, 0.026), [[0.001, 0], [0.007, 0.08], [0.0095, 0.35], [0.0085, 0.7], [0.006, 0.92], [0.001, 1]], 10), neckW, () => 0.9));
+  }
+  // the yoke: the skin inside the blouse's neckline, sloping from the neck (higher at the back) out
+  // under the neckline, with the hollow of the throat and the inner ends of the collarbones
+  {
+    const SEG = 56;
+    const ROWS = 12;
+    const pos: number[] = [];
+    const idx: number[] = [];
+    const tone: number[] = [];
+    for (let r = 0; r <= ROWS; r++) {
+      const t = r / ROWS;
+      for (let i = 0; i <= SEG; i++) {
+        const a = (i / SEG) * Math.PI * 2;
+        const fr = Math.sin(a);
+        const yNeck = THREE.MathUtils.lerp(1.5, 1.462, (fr + 1) / 2);
+        const y = yNeck - (yNeck - 1.451) * t ** 1.5;
+        let rad = THREE.MathUtils.lerp(0.036, 0.096, t);
+        let dark = 0;
+        if (fr > 0) {
+          const ax = Math.abs(Math.cos(a) * rad);
+          const cy = 1.454;
+          const along = sstep(0.01, 0.03, ax) * fr;
+          const ridge = Math.exp(-(((y - cy) / 0.004) ** 2));
+          const hollow = Math.exp(-(((y - cy - 0.01) / 0.005) ** 2));
+          rad += along * (0.0035 * ridge - 0.003 * hollow);
+          dark = along * (0.35 * hollow - 0.1 * ridge);
+        }
+        pos.push(Math.cos(a) * rad, y, Math.sin(a) * rad * 0.68 - 0.008);
+        tone.push(0.95 - dark);
+        if (r < ROWS && i < SEG) {
+          const p = r * (SEG + 1) + i;
+          idx.push(p, p + 1, p + SEG + 1, p + 1, p + SEG + 2, p + SEG + 1);
+        }
+      }
+    }
+    const yoke = new THREE.BufferGeometry();
+    yoke.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    yoke.setIndex(idx);
+    yoke.computeVertexNormals();
+    let k = 0;
+    skinParts.push(skin(yoke, (p) => {
+      // its inner edge goes with the neck
+      const n = sstep(0.07, 0.045, Math.hypot(p.x, (p.z + 0.008) / 0.68)) * 0.6;
+      const w = torsoW(p).map(([b, x]): [BoneId, number] => [b, x * (1 - n)]);
+      if (n > 0) w.push(['neck', n]);
+      return w;
+    }, () => tone[k++]));
   }
 
   for (const s of ['L', 'R'] as const) {
@@ -370,10 +513,22 @@ function callerGeometry() {
     const el = J(`fore${s}`);
     const wr = J(`hand${s}`);
     const kn = J(`fing${s}`);
-    // arms: thin but fleshed, bony at the elbow and wrist
-    skinParts.push(skin(limb(sh.clone().add(new THREE.Vector3(0, 0.035, 0)), el, [[0.001, 0], [0.044, 0.05], [0.046, 0.2], [0.041, 0.55], [0.033, 0.9], [0.001, 1]], 16), along(sh, el, `arm${s}`, `clav${s}`, undefined, 0.12)));
-    skinParts.push(skin(new THREE.SphereGeometry(0.032, 12, 8).translate(el.x, el.y, el.z), (p) => (p.y > el.y ? [[`arm${s}`, 0.6], [`fore${s}`, 0.4]] : [[`fore${s}`, 1]])));
-    skinParts.push(skin(limb(el.clone().add(new THREE.Vector3(0, 0.015, 0)), wr, [[0.001, 0], [0.031, 0.04], [0.035, 0.18], [0.03, 0.45], [0.022, 0.85], [0.021, 0.97], [0.001, 1]], 14), along(el, wr, `fore${s}`, undefined, `hand${s}`, 0.1)));
+    // arms: one skin from the shoulder to the wrist, so the elbow bends without a seam: a thin deltoid,
+    // a wasted upper arm, a bony elbow, the forearm swelling just below it and a narrow wrist
+    const top = sh.clone().add(new THREE.Vector3(0, 0.01, 0));
+    const aw = wr.clone().sub(top);
+    const tE = el.clone().sub(top).dot(aw) / aw.lengthSq();
+    skinParts.push(skin(
+      limb(top, wr, [[0.001, 0], [0.026, 0.02], [0.038, 0.05], [0.044, 0.1], [0.041, 0.2], [0.036, 0.32], [0.032, 0.42], [0.03, tE - 0.04], [0.032, tE], [0.031, tE + 0.04], [0.033, tE + 0.1], [0.032, tE + 0.18], [0.027, tE + 0.3], [0.022, 0.94], [0.021, 0.985], [0.001, 1]], 16),
+      (p): W => {
+        const t = THREE.MathUtils.clamp(p.clone().sub(top).dot(aw) / aw.lengthSq(), 0, 1);
+        const f = sstep(tE - 0.05, tE + 0.05, t);
+        const c = 0.5 * (1 - sstep(0, 0.1, t));
+        const h = 0.5 * sstep(0.94, 1, t);
+        return [[`arm${s}`, (1 - f) * (1 - c)], [`clav${s}`, (1 - f) * c], [`fore${s}`, f * (1 - h)], [`hand${s}`, f * h]];
+      },
+      (p) => 0.9 + 0.1 * sstep(-0.03, 0.02, p.z - top.z),
+    ));
     // hand: a narrow palm facing her thigh, a thumb, and four long fingers in two bent segments
     const palm = new THREE.SphereGeometry(1, 12, 10);
     palm.scale(0.018, 0.052, 0.042);
@@ -405,9 +560,8 @@ function callerGeometry() {
     foot.computeVertexNormals();
     skinParts.push(skin(foot, `foot${s}`, () => 0.5));
 
-    // the blouse sleeve, capped over the round of the shoulder
-    cloth.push(skin(new THREE.SphereGeometry(0.06, 14, 10).scale(1, 0.9, 0.85).translate(sh.x - side * 0.004, sh.y + 0.012, sh.z), (): W => [[`arm${s}`, 0.65], [`clav${s}`, 0.35]], () => 1, -1));
-    cloth.push(skin(limb(sh.clone().add(new THREE.Vector3(0, 0.04, 0)), sh.clone().lerp(el, 0.36), [[0.054, 0], [0.055, 0.3], [0.052, 0.85], [0.05, 1]], 14), along(sh, el, `arm${s}`, `clav${s}`, undefined, 0.25), () => 1, -1));
+    // the blouse sleeve: fitted, rounding over the shoulder, ending a third of the way to the elbow
+    cloth.push(skin(limb(sh.clone().add(new THREE.Vector3(0, 0.026, 0)), sh.clone().lerp(el, 0.4), [[0.001, 0], [0.026, 0.05], [0.038, 0.12], [0.045, 0.2], [0.049, 0.32], [0.048, 0.7], [0.046, 0.88], [0.047, 0.97], [0.045, 1]], 16), along(sh, el, `arm${s}`, `clav${s}`, undefined, 0.25), () => 1, -1));
     // bangles near the wrist
     const fdir = wr.clone().sub(el).normalize();
     for (const t of [0.8, 0.86]) {
@@ -421,7 +575,7 @@ function callerGeometry() {
 
   // saree: blouse and wrap over the torso
   const torso = new THREE.LatheGeometry(
-    [[0.001, 0.955], [0.134, 0.96], [0.136, 1.02], [0.138, 1.1], [0.146, 1.2], [0.152, 1.27], [0.158, 1.33], [0.168, 1.375], [0.166, 1.405], [0.146, 1.43], [0.112, 1.448], [0.084, 1.456]].map(([r, y]) => new THREE.Vector2(r, y)),
+    [[0.001, 0.955], [0.138, 0.96], [0.13, 1.0], [0.122, 1.06], [0.125, 1.12], [0.14, 1.2], [0.15, 1.27], [0.158, 1.33], [0.163, 1.37], [0.16, 1.4], [0.145, 1.425], [0.115, 1.444], [0.084, 1.456]].map(([r, y]) => new THREE.Vector2(r, y)),
     64,
   );
   torso.scale(1, 1, 0.72);
@@ -493,39 +647,50 @@ function callerGeometry() {
   pallu.computeVertexNormals();
   cloth.push(skin(pallu, torsoW, () => 0.95, 0.58));
 
-  // inside the mouth: a dark cavity, rotten teeth top and bottom; milky eyes deep in the sockets
+  // inside the mouth: a dark cavity, rotten teeth top and bottom
   const cav = new THREE.SphereGeometry(1, 14, 10);
-  cav.scale(0.03, 0.026, 0.03);
-  const cc = headAt(0, -0.53, 0.55);
+  cav.scale(0.017, 0.011, 0.016);
+  const cc = F(0, MOUTH_Y - 0.001, 0.05);
   cav.translate(cc.x, cc.y, cc.z);
   detail.push(skin(cav, (p) => (p.y > cc.y ? [['head', 1]] : [['jaw', 1]]), () => 0.015));
   const tr = new Rng(77);
-  for (const [row, bone, yy] of [[0, 'head', -0.49], [1, 'jaw', -0.565]] as const) {
+  for (const [row, bone] of [[0, 'head'], [1, 'jaw']] as const) {
     for (let i = 0; i < 8; i++) {
-      const a = (i / 7 - 0.5) * 1.05;
-      const h = tr.range(0.7, 1.15) * (row ? 0.009 : 0.011);
-      const tooth = new THREE.BoxGeometry(0.0062, h, 0.004);
+      const a = (i / 7 - 0.5) * 1.5;
+      const h = tr.range(0.75, 1.1) * (row ? 0.0075 : 0.009);
+      const tooth = new THREE.BoxGeometry(0.0048, h, 0.0035);
       tooth.rotateY(a);
-      const tp = headAt(Math.sin(a) * 0.25, yy + (row ? 1 : -1) * tr.range(0, 0.01), 0.58 + Math.cos(a) * 0.2);
+      // upper teeth hang to the line of the mouth, lower ones stand just under it
+      const y = row ? MOUTH_Y - 0.002 - h / 2 : MOUTH_Y - 0.001 + h / 2;
+      const tp = F(Math.sin(a) * 0.019, y + tr.range(-0.001, 0.001), 0.054 + Math.cos(a) * 0.019);
       tooth.translate(tp.x, tp.y, tp.z);
-      const dirt = tr.range(0.45, 1);
-      detail.push(skin(tooth, bone, () => [0.62 * dirt, 0.58 * dirt, 0.46 * dirt]));
+      const dirt = tr.range(0.3, 0.7);
+      detail.push(skin(tooth, bone, () => [0.62 * dirt, 0.56 * dirt, 0.42 * dirt]));
     }
   }
+  // milky eyes deep in the sockets, behind the lids
   for (const side of [1, -1]) {
-    const e = headAt(side * 0.35, 0.08, 0.68);
-    detail.push(skin(new THREE.SphereGeometry(0.0125, 12, 10).translate(e.x, e.y, e.z), 'head', () => [0.36, 0.38, 0.37]));
+    const e = F(side * EYE.x, EYE.y, EYE.z);
+    detail.push(skin(new THREE.SphereGeometry(EYE.r, 16, 12).translate(e.x, e.y, e.z), 'head', () => [0.36, 0.38, 0.37]));
     // a pale, pinprick iris that catches the light
     const iris = new THREE.SphereGeometry(1, 8, 6);
     iris.scale(0.0042, 0.0042, 0.0018);
-    iris.translate(e.x + side * 0.0008, e.y + 0.0005, e.z + 0.0118);
+    iris.translate(e.x + side * 0.0008, e.y + 0.0005, e.z + EYE.r - 0.0004);
     eyes.push(skin(iris, 'head'));
   }
 
+  // teeth, mouth, eyeballs and bangles draw in the skin's own draw call, after it, so the lips always
+  // cover the teeth (separate transparent meshes sort by their centres and can draw in either order).
+  // Their colours were given as-is: undo the skin's tint.
+  const tint = new THREE.Color(SKIN);
+  for (const g of detail) {
+    const c = g.attributes.color as THREE.BufferAttribute;
+    for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) / tint.r, c.getY(i) / tint.g, c.getZ(i) / tint.b);
+  }
+  skinParts.push(...detail);
   built = {
     skin: mergeGeometries(skinParts),
     cloth: mergeGeometries(cloth),
-    detail: mergeGeometries(detail),
     eyes: mergeGeometries(eyes),
     hair: hairGeometry(),
   };
@@ -551,7 +716,8 @@ function hairGeometry() {
   const idx: number[] = [];
   const lerp = THREE.MathUtils.lerp;
   const HJ = J('head');
-  const C = HEAD_C.clone().sub(HJ);
+  // a little back from the middle of the head: the cranium sits behind the face
+  const C = HEAD_C.clone().sub(HJ).add(new THREE.Vector3(0, 0, -0.006));
   // the scalp: a little outside the skull everywhere
   const B = HEAD_S.clone().multiply(new THREE.Vector3(1.07, 1.08, 1.1));
   /** a point on the scalp: `th` round from the face, `u` the height on the unit head, `lift` off it */
@@ -584,7 +750,7 @@ function hairGeometry() {
   const GAP = [[1.75, 0], [1.718, 0.026], [1.692, 0.032], [1.64, 0.03], [1.58, 0.036], [1.4, 0.045], [0.8, 0.05]];
 
   /** a ribbon through `pts`; `onSkull` points lie on the scalp, the rest hang (`ts` 0..1 down the free part) */
-  const strand = (pts: THREE.Vector3[], ts: number[], onSkull: number, root: THREE.Vector3, width: number, phase: number, shade: number) => {
+  const strand = (pts: THREE.Vector3[], ts: number[], onSkull: number, root: THREE.Vector3, width: number, phase: number, shade: number, tilt: number) => {
     const base = pos.length / 3;
     pts.forEach((pt, i) => {
       const nx = pt.x;
@@ -593,7 +759,7 @@ function hairGeometry() {
       // the width runs round the head; the normal faces out (and up, on the skull)
       const tx = nz / nl;
       const tz = -nx / nl;
-      const w = width * (1 - 0.7 * ts[i]) * 0.5;
+      const w = width * (1 - 0.6 * ts[i]) * (1 - 0.92 * sstep(0.72, 1, ts[i])) * 0.5;
       const up = i < onSkull ? 0.6 : 0;
       // darker at the root, lighter out along the strand
       const sh = shade * lerp(0.6, 1, Math.min(1, (i + 1) / (onSkull + 2) + ts[i]));
@@ -601,7 +767,8 @@ function hairGeometry() {
         pos.push(pt.x + tx * w * sgn, pt.y, pt.z + tz * w * sgn);
         at.push(ts[i]);
         ph.push(phase);
-        nr.push(nx / nl, up, nz / nl);
+        // each strand turned a little its own way, so a torch catches some, not the whole curtain
+        nr.push(nx / nl + tx * tilt, up, nz / nl + tz * tilt);
         roots.push(root.x, root.y, root.z);
         col.push(sh, sh, sh);
       }
@@ -633,6 +800,7 @@ function hairGeometry() {
       // the higher the root, the further out its layer lies
       const layer = sstep(hl, 1, u0);
       const lift = 1.01 + 0.04 * layer + r.range(0, 0.006);
+      const Ls = L * r.range(0.82, 1.08);
       const pts: THREE.Vector3[] = [];
       const ts: number[] = [];
       // on the skull: straight down from the root to where it lifts off
@@ -653,7 +821,7 @@ function hairGeometry() {
       for (let i = 1; i <= SEG; i++) {
         // finer near the head, where the curtain parts
         const t = (i / SEG) ** 1.4;
-        const d = L * t;
+        const d = Ls * t;
         const y = E.y - d;
         const yb = y + HJ.y;
         const thH = lerp(th, toward, sstep(0.04, 0.22, d)) + gather * t;
@@ -670,7 +838,7 @@ function hairGeometry() {
         pts.push(new THREE.Vector3(x, y + 0.012 * Math.sin(t * 9 + phase) * t, z));
         ts.push(t);
       }
-      strand(pts, ts, ns + 1, E, width, phase, r.range(0.8, 1.1) * lerp(0.5, 1, layer));
+      strand(pts, ts, ns + 1, E, width, phase, r.range(0.8, 1.1) * lerp(0.5, 1, layer), r.range(-0.7, 0.7));
     }
   }
   // the scalp under it all, in the deepest shadow
@@ -714,15 +882,16 @@ export function CallerFigure({ control }: { control: React.MutableRefObject<Ghos
     const geo = callerGeometry();
     const { skeleton, bones, rest } = makeSkeleton();
     // a faint cold pallor of her own, so the face reads even at the edge of the beam
-    const skinMat = new THREE.MeshStandardMaterial({ color: '#97a0a3', emissive: '#0e1417', roughness: 0.34, vertexColors: true, transparent: true });
+    const skinMat = new THREE.MeshStandardMaterial({ color: SKIN, emissive: '#0e1417', roughness: 0.52, vertexColors: true, transparent: true });
     skinShader(skinMat, u);
     const clothMat = new THREE.MeshStandardMaterial({ color: '#b3b2ab', emissive: '#08090a', roughness: 0.95, vertexColors: true, side: THREE.DoubleSide, transparent: true });
     clothShader(clothMat, u);
-    const detailMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.3, metalness: 0.15, vertexColors: true, transparent: true });
     // a faint glint, just over the bloom threshold
     const eyeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.9, 2.0, 2.25), toneMapped: false, transparent: true });
-    const hairMat = new THREE.MeshStandardMaterial({ color: '#050506', roughness: 0.3, metalness: 0.1, vertexColors: true, side: THREE.DoubleSide, transparent: true });
+    const hairMat = new THREE.MeshStandardMaterial({ color: '#050506', roughness: 0.45, metalness: 0.1, vertexColors: true, side: THREE.DoubleSide, transparent: true });
     hairShader(hairMat, u, grav);
+    // one pass, not a back pass and a front pass: the hair is most of her triangles
+    hairMat.forceSinglePass = true;
     const mk = (g: THREE.BufferGeometry, m: THREE.Material) => {
       const s = new THREE.SkinnedMesh(g, m);
       s.bind(skeleton, new THREE.Matrix4());
@@ -735,8 +904,8 @@ export function CallerFigure({ control }: { control: React.MutableRefObject<Ghos
     head.add(hair);
     return {
       bones, rest, head,
-      meshes: [mk(geo.skin, skinMat), mk(geo.cloth, clothMat), mk(geo.detail, detailMat), mk(geo.eyes, eyeMat)],
-      mats: [skinMat, clothMat, detailMat, eyeMat, hairMat],
+      meshes: [mk(geo.skin, skinMat), mk(geo.cloth, clothMat), mk(geo.eyes, eyeMat)],
+      mats: [skinMat, clothMat, eyeMat, hairMat],
     };
   }, [u, grav]);
 
@@ -821,7 +990,7 @@ export function CallerFigure({ control }: { control: React.MutableRefObject<Ghos
       h.rotation.z = damp(h.rotation.z, tilt, 3, dt);
     }
     // the jaw hangs a little open; in the lunge it drops into a scream
-    set('jaw', 0.035 + breathe * 0.012 + sc * (0.6 + 0.05 * Math.sin(t * 31)) + stun * 0.22, 0, 0);
+    set('jaw', 0.003 + breathe * 0.003 + sc * (0.6 + 0.05 * Math.sin(t * 31)) + stun * 0.22, 0, 0);
     // arms: hanging limp and swinging a little; reaching for you; up over her face in the beam
     const swing = 0.13 * walk * (1 - run);
     const runArm = run * (0.62 + 0.28 * sn);
