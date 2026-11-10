@@ -26,6 +26,8 @@ export type Action = keyof typeof BINDINGS;
 const down = new Set<string>();
 
 export const isDown = (a: Action) => BINDINGS[a].some((k) => down.has(k));
+/** a raw key code held right now (the testing Studio's free camera) */
+export const keyHeld = (code: string) => down.has(code);
 export const matches = (a: Action, code: string) => (BINDINGS[a] as readonly string[]).includes(code);
 
 export const mouse = { dx: 0, dy: 0 };

@@ -3,7 +3,7 @@ import {
   ACHIEVEMENTS, DOCUMENTS, FUSE_LABELS, FUSE_VALUES, GHOST_ABILITIES, OBJECTIVES, RADIO_PRESETS, STORY_BEATS, SURVIVORS, logbookText,
   type GhostAbilityId, type WorldSnapshot,
 } from '@nishi/shared';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { audio } from '../audio/engine';
 import { stopSpeech } from '../audio/speech';
 import { handleSimEvent } from '../game/events';
@@ -13,6 +13,7 @@ import { TOUCH, enterFullscreen, lockPointer } from '../game/input';
 import { TouchControls } from './TouchControls';
 import { resetFx } from '../game/fx';
 import { LocalSession } from '../game/session';
+import { runtime } from '../game/runtime';
 import { intensityValue } from '../state/settings';
 import { useApp } from '../state/store';
 import { GameCanvas } from '../three/GameScene';
@@ -659,6 +660,9 @@ function EndScreen({ session }: { session: GameSession }) {
   );
 }
 
+// the testing Studio exists only in dev builds: in production this is null and the import is dropped
+const Studio = import.meta.env.DEV ? lazy(() => import('../studio/Studio').then((m) => ({ default: m.Studio }))) : null;
+
 export function GameView() {
   const session = useApp((s) => s.session);
   const overlay = useApp((s) => s.overlay);
@@ -696,7 +700,8 @@ export function GameView() {
   const sceneReady = useApp((s) => !!s.hud.zone);
   // the chapter opens on its first story card once the station is on screen
   useEffect(() => {
-    if (!sceneReady || !session || session.role === 'ghost') return;
+    // (the testing Studio opens without it: any card can be shown from its Story tab)
+    if (!sceneReady || !session || session.role === 'ghost' || runtime.studio.on) return;
     const id = setTimeout(() => useApp.getState().beat('arrival'), 1200);
     return () => clearTimeout(id);
   }, [sceneReady, session]);
@@ -710,7 +715,7 @@ export function GameView() {
       <ChatFeed />
       <Subtitles />
       <Toasts />
-      {!locked && !overlay && !TOUCH && <div className="click-hint">Click to take control</div>}
+      {!locked && !overlay && !TOUCH && !runtime.studio.open && <div className="click-hint">Click to take control</div>}
       {TOUCH && session.role !== 'ghost' && <TouchControls />}
       {overlay === 'journal' && <Journal session={session} />}
       {overlay === 'doc' && <DocViewer session={session} />}
@@ -719,6 +724,11 @@ export function GameView() {
       {overlay === 'chat' && <ChatBox session={session} />}
       {overlay === 'pause' && <PauseMenu session={session} />}
       {overlay === 'end' && <EndScreen session={session} />}
+      {Studio && runtime.studio.on && session instanceof LocalSession && (
+        <Suspense fallback={null}>
+          <Studio />
+        </Suspense>
+      )}
     </div>
   );
 }

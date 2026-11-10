@@ -154,7 +154,8 @@ export function GameCanvas({ session }: { session: GameSession }) {
     const onLock = () => {
       fx.pointerLocked = !!document.pointerLockElement;
       const s = app();
-      if (!document.pointerLockElement && s.screen === 'game' && !s.overlay) s.setOverlay('pause');
+      // (the testing Studio frees the mouse on purpose: no pause menu then)
+      if (!document.pointerLockElement && s.screen === 'game' && !s.overlay && !runtime.studio.open) s.setOverlay('pause');
     };
     document.addEventListener('pointerlockchange', onLock);
     return () => document.removeEventListener('pointerlockchange', onLock);

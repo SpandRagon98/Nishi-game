@@ -22,6 +22,7 @@ type HudGuide = HudState['guide'];
 import { lightLevels } from './Lights';
 import { torch } from './Atmosphere';
 import { HeldLight } from './HeldLight';
+import { flyCamera, resetFlyCamera } from '../studio/flycam';
 
 const HALF = 0.55;
 const RADIUS = 0.3;
@@ -170,7 +171,10 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
       s.pitch = runtime.debugLook.pitch;
       runtime.debugLook = null;
     }
-    const cine = inCutscene();
+    // testing Studio free camera: the body stays put, the view flies (dev builds only)
+    const fly = import.meta.env.DEV && runtime.studio.fly;
+    if (import.meta.env.DEV && !fly) resetFlyCamera();
+    const cine = inCutscene() || fly;
     if ((!overlay || overlay === 'journal') && !cine) {
       const k = 0.0021 * settings.mouseSensitivity;
       s.yaw -= m.dx * k;
@@ -256,7 +260,7 @@ export function SurvivorController({ session, level, shadows }: { session: GameS
     camera.position.y += Math.sin(tq * 27.1 + 1.3) * Math.sin(tq * 9.7) * shake * 0.03;
     tmpE.set(s.pitch, s.yaw, me.status === 'downed' ? 0.5 : moving ? Math.sin(s.bob * 0.5) * 0.004 * bobAmt : 0);
     camera.quaternion.setFromEuler(tmpE);
-    const cineDir = applyCutscene(camera as THREE.PerspectiveCamera);
+    const cineDir = import.meta.env.DEV && fly ? flyCamera(camera, dt, m, s.yaw, s.pitch) : applyCutscene(camera as THREE.PerspectiveCamera);
     runtime.eye = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
     const fwd = cineDir ?? forwardFromYawPitch(s.yaw, s.pitch);
     audio.setListener(runtime.eye, fwd);

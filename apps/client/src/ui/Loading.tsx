@@ -4,6 +4,7 @@ import { audio } from '../audio/engine';
 import { resetFx } from '../game/fx';
 import { LocalSession, NetworkSession } from '../game/session';
 import { graphicsProfile, intensityValue } from '../state/settings';
+import { runtime } from '../game/runtime';
 import { useApp } from '../state/store';
 import { getTextures } from '../three/textures';
 import { Btn, Meter, TapeLines } from './common';
@@ -48,6 +49,11 @@ export function Loading() {
     }
     go('game');
   };
+
+  // the testing Studio skips the wait
+  useEffect(() => {
+    if (import.meta.env.DEV && ready && runtime.studio.on) begin();
+  }, [ready]);
 
   // multiplayer matches are already running: don't keep teammates waiting
   useEffect(() => {

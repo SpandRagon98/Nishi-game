@@ -1,11 +1,11 @@
-# Builds the game and publishes it to GitHub Pages on every push to main.
+# Builds the game and publishes it to GitHub Pages: PRODUCTION.
+# It never runs on a push. Nothing ships until someone asks for it: `npm run ship` (or the
+# "Run workflow" button on GitHub's Actions tab) publishes the current main.
 # The hosted build is story-only (VITE_SOLO_ONLY): Pages serves static files, so there is no
-# multiplayer server behind it.
+# multiplayer server behind it. The testing Studio only exists in dev builds, so it never ships.
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

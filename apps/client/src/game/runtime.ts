@@ -13,4 +13,12 @@ export const runtime = {
   debugLook: null as { yaw: number; pitch: number } | null,
   /** dev-only: pin the Caller in view (automated screenshots) */
   debugCaller: null as WorldSnapshot['ghost'] | null,
+  /** the testing Studio (dev builds only, see studio/): panel, paused world, free camera, ghost pose */
+  studio: {
+    on: false,
+    open: false,
+    paused: false,
+    fly: false,
+    ghost: null as null | { scare: number; speed: number; stunned: boolean; spin: number },
+  },
 };

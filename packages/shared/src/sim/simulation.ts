@@ -105,6 +105,8 @@ export class MatchSimulation {
   private timers: { at: number; fn: () => void }[] = [];
   private events: SimEvent[] = [];
   private teleports = new Map<string, Vec3>();
+  /** testing-mode switches (the dev Studio); never set in a real match */
+  readonly debug = { god: false, calm: false };
   private checkpoint: Checkpoint | null = null;
   private started = false;
   private thirdCall = false;
@@ -570,6 +572,62 @@ export class MatchSimulation {
     return { ok: false, reason: 'Wrong code' };
   }
 
+  // ───────────────────────────── testing mode ─────────────────────────────
+
+  /**
+   * Testing mode: put the world at the start of `next`, as if every earlier step had been played
+   * properly (items, key, reels, power, code, gate), and checkpoint there. No events or cutscenes.
+   */
+  debugSkipTo(next: ObjectiveId) {
+    const w = this.world;
+    const order = OBJECTIVES.map((o) => o.id);
+    for (const id of order.slice(0, Math.max(0, order.indexOf(next)))) {
+      if (id === 'flashlight') for (const sv of this.survivors.values()) sv.hasFlashlight = true;
+      if (id === 'office') {
+        w.office.logbook = w.office.drawer = true;
+        w.fuse.clue = [...this.fuseSolution];
+        if (!w.inventory.includes('maintenance_key')) w.inventory.push('maintenance_key');
+      }
+      if (id === 'reels') {
+        for (const r of ['reel_a', 'reel_b', 'reel_c']) {
+          if (!w.collected.includes(r)) w.collected.push(r), w.inventory.push(r);
+          w.reelDigits[r] = this.digits[r];
+        }
+      }
+      if (id === 'power') {
+        w.fuse.solved = w.power = true;
+        w.fuse.slots = [...this.fuseSolution];
+        w.decodeOrder = [...this.order];
+        w.decodeCode = this.order.map((l) => this.digits[`reel_${l.toLowerCase()}`]).join('');
+      }
+      if (id === 'decode') w.decoded = true;
+      if (id === 'exit') {
+        w.exitOpen = true;
+        w.exitOpenAt = this.time;
+      }
+      w.objectives[id] = true;
+    }
+    if (order.indexOf(next) > 0) this.saveCheckpoint(order[order.indexOf(next) - 1]);
+  }
+
+  /** Testing mode: start a hunt now, or send the Caller back to quietly roaming. */
+  debugGhost(action: 'hunt' | 'calm') {
+    const g = this.ghost;
+    if (action === 'hunt') return this.forceHunt(20);
+    g.mode = 'roam';
+    g.visible = false;
+    g.huntUntil = g.warnUntil = 0;
+  }
+
+  private saveCheckpoint(id: ObjectiveId) {
+    this.checkpoint = {
+      key: id === 'exit' ? 'exit' : id,
+      world: structuredClone(this.world),
+      threat: this.threat,
+      flashlights: Object.fromEntries([...this.survivors.values()].map((s) => [s.id, s.hasFlashlight])),
+    };
+  }
+
   private complete(id: ObjectiveId) {
     if (this.world.objectives[id]) return;
     this.world.objectives[id] = true;
@@ -580,12 +638,7 @@ export class MatchSimulation {
     }[id as 'flashlight' | 'office' | 'power' | 'decode'];
     if (line) this.after(2.5, () => this.emit({ type: 'radio', ...line, to: this.survivorIds() }));
     if (this.mode === 'solo' && id !== 'escape') {
-      this.checkpoint = {
-        key: id === 'exit' ? 'exit' : id,
-        world: structuredClone(this.world),
-        threat: this.threat,
-        flashlights: Object.fromEntries([...this.survivors.values()].map((s) => [s.id, s.hasFlashlight])),
-      };
+      this.saveCheckpoint(id);
       this.emit({ type: 'checkpoint', key: id });
     }
   }
@@ -699,7 +752,7 @@ export class MatchSimulation {
     let best: Survivor | null = null;
     let bd = Infinity;
     for (const s of this.survivors.values()) {
-      if (s.status !== 'alive' || s.invulnUntil > this.time) continue;
+      if (s.status !== 'alive' || s.invulnUntil > this.time || this.debug.god) continue;
       if (s.hiding) {
         const spot = this.level.hidingSpots.find((h) => h.id === s.hiding)!;
         const known = (g.knownHiding[spot.id] ?? 0) > this.time;
@@ -936,6 +989,7 @@ export class MatchSimulation {
 
   private forceHunt(duration: number) {
     const g = this.ghost;
+    if (this.debug.calm) return;
     if (g.controllerId) {
       // a player-controlled Caller is told, not driven
       this.emit({ type: 'message', text: 'The station wakes. Hunt now — your hunt is ready.', tone: 'warn', to: [g.controllerId] });
@@ -964,6 +1018,7 @@ export class MatchSimulation {
   private updateGhost(dt: number) {
     const g = this.ghost;
     const ai = !g.controllerId;
+    if (this.debug.calm && g.mode !== 'roam') this.debugGhost('calm');
 
     if (g.mode === 'stunned' && this.time >= g.stunUntil) g.mode = g.huntUntil > this.time ? 'hunt' : 'roam';
     if (g.mode === 'warn' && this.time >= g.warnUntil) {
@@ -985,7 +1040,7 @@ export class MatchSimulation {
     g.visible = g.mode === 'hunt' || g.mode === 'stunned';
     if (g.mode !== 'hunt' && g.mode !== 'warn') g.energy = clamp(g.energy + GHOST_ENERGY_REGEN * dt, 0, GHOST_ENERGY_MAX);
 
-    if (!ai || this.passiveGhost) return;
+    if (!ai || this.passiveGhost || this.debug.calm) return;
 
     // AI decides to hunt
     if (g.mode === 'roam' && this.time >= g.huntCooldownUntil && this.threat >= 15) {
@@ -1322,12 +1377,15 @@ export class MatchSimulation {
   }
 
   /** Test/debug only: place a survivor (bypasses movement validation). */
-  debugPlace(id: string, p: Vec3) {
+  debugPlace(id: string, p: Vec3, tellClient = false) {
     const s = this.survivors.get(id);
     if (s) {
       s.pos = copyV(p);
       s.lastValid = copyV(p);
       s.lastMoveAt = this.time;
+      s.hiding = null;
+      // the testing Studio moves the player's own body too, through the teleport channel
+      if (tellClient) this.teleports.set(id, copyV(p));
     }
   }
 

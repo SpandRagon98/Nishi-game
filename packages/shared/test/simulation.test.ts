@@ -117,6 +117,36 @@ describe('MatchSimulation — solo playthrough', () => {
   });
 });
 
+describe('MatchSimulation — testing mode', () => {
+  it('jumps to any step with every earlier one done, and calm / god mode hold the Caller off', () => {
+    const sim = new MatchSimulation({ seed: 7, mode: 'solo' });
+    sim.addSurvivor('p', 'Aditi', 'aditi');
+    sim.tick(0.05);
+    sim.debugSkipTo('decode');
+    const w = sim.snapshot().world;
+    expect(['flashlight', 'office', 'reels', 'power'].every((o) => w.objectives[o as 'power'])).toBe(true);
+    expect(w.objectives.decode).toBe(false);
+    expect(sim.snapshot().survivors[0].hasFlashlight).toBe(true);
+    expect(w.power && w.inventory.includes('maintenance_key') && w.collected.length === 3).toBe(true);
+    expect(w.decodeCode).toMatch(/^\d{3}$/);
+    // the skipped-to step is playable: the announced code opens the console
+    sim.debugPlace('p', at(posOf(sim, 'pa_console')));
+    expect(sim.keypadSubmit('p', w.decodeCode!).ok).toBe(true);
+
+    sim.debug.calm = true;
+    sim.debugGhost('hunt');
+    run(sim, 30);
+    expect(sim.snapshot().ghost.mode).toBe('roam');
+
+    sim.debug.calm = false;
+    sim.debug.god = true;
+    sim.debugGhost('hunt');
+    sim.debugPlaceGhost(sim.snapshot().survivors[0].pos);
+    run(sim, 12);
+    expect(sim.snapshot().survivors[0].status).toBe('alive');
+  });
+});
+
 describe('MatchSimulation — validation', () => {
   const fresh = () => {
     const sim = new MatchSimulation({ seed: 5, mode: 'solo', passiveGhost: true });

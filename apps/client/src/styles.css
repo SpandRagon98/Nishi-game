@@ -511,3 +511,31 @@ html.touch, html.touch body { overscroll-behavior: none; -webkit-tap-highlight-c
   /* puzzles, journal and pause panels are taller than a phone: let them scroll, top edge reachable */
   .overlay { overflow-y: auto; align-items: safe center; padding: 8px 0; }
 }
+
+/* ───────────── testing Studio (dev builds only) ───────────── */
+.studio { position: absolute; top: 0; right: 0; bottom: 0; width: min(330px, 48vw); z-index: 60; display: flex; flex-direction: column; background: rgba(8, 8, 10, 0.92); border-left: 1px solid var(--line); color: var(--bone); font-family: var(--sans); font-size: 13px; backdrop-filter: blur(6px); }
+.studio header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.studio header b { font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); }
+.studio header button { margin-left: auto; background: none; border: 0; color: var(--bone-dim); font-size: 20px; cursor: pointer; line-height: 1; }
+.studio-dim { font-family: var(--mono); font-size: 10px; color: var(--grey); }
+.studio nav { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.studio nav button { flex: 1 0 auto; padding: 8px 6px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--bone-dim); font-family: var(--mono); font-size: 11px; cursor: pointer; }
+.studio nav button.on { color: var(--bone); border-bottom-color: var(--amber); }
+.studio-body { overflow-y: auto; padding: 10px 12px 18px; display: flex; flex-direction: column; gap: 5px; }
+.studio h4 { margin: 10px 0 2px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--grey); font-weight: 500; }
+.studio-help { margin: 0 0 4px; color: var(--bone-dim); font-size: 12px; line-height: 1.45; }
+.studio-row { text-align: left; padding: 7px 10px; background: var(--char-2); border: 1px solid var(--line); color: var(--bone); border-radius: 3px; cursor: pointer; font: inherit; }
+.studio-row:hover { border-color: var(--amber); }
+.studio-row.on { border-color: var(--amber); color: var(--amber); }
+.studio-row.done { color: var(--bone-dim); }
+.studio-row span { display: inline-block; width: 18px; font-family: var(--mono); color: var(--amber); }
+.studio-check { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; color: var(--bone); cursor: pointer; line-height: 1.35; }
+.studio-sliders { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
+.studio-sliders label:not(.studio-check) { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--bone-dim); }
+.studio-seg { display: flex; gap: 4px; }
+.studio-seg button { flex: 1; padding: 6px 0; background: var(--char-2); border: 1px solid var(--line); color: var(--bone-dim); font-family: var(--mono); font-size: 11px; cursor: pointer; }
+.studio-seg button.on { color: var(--amber); border-color: var(--amber); }
+.studio textarea { width: 100%; box-sizing: border-box; background: var(--char); border: 1px solid var(--line); color: var(--bone); font: inherit; padding: 8px; resize: vertical; }
+.studio-ctx { margin: 6px 0 0; padding: 8px; background: var(--char); border: 1px solid var(--line); font-family: var(--mono); font-size: 10.5px; color: var(--grey); white-space: pre-wrap; }
+.studio-tab-btn { position: absolute; right: 0; top: 40%; z-index: 60; writing-mode: vertical-rl; padding: 12px 6px; background: rgba(8, 8, 10, 0.85); border: 1px solid var(--line); border-right: 0; color: var(--amber); font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; cursor: pointer; }
+body.studio-clean .hud, body.studio-clean .guide, body.studio-clean .toasts, body.studio-clean .crosshair, body.studio-clean .prompt, body.studio-clean .subtitles, body.studio-clean .touch-pad, body.studio-clean .fps-meter { display: none !important; }

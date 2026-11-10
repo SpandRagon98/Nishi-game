@@ -203,6 +203,9 @@ export function GhostActor() {
     else grp.position.lerp(target, Math.min(1, dt * 10));
     grp.rotation.y = THREE.MathUtils.lerp(grp.rotation.y, g.yaw + Math.PI, Math.min(1, dt * 8));
     const c = control.current;
+    // testing Studio: the panel's sliders pose the pinned Caller
+    const pose = import.meta.env.DEV && runtime.debugCaller ? runtime.studio.ghost : null;
+    if (pose) grp.rotation.y = g.yaw + Math.PI + pose.spin;
     c.speed = dt > 0 ? Math.min(1, last.current.distanceTo(grp.position) / dt / 5) : 0;
     last.current.copy(grp.position);
     c.stunned = g.mode === 'stunned';
@@ -210,6 +213,11 @@ export function GhostActor() {
     // hunting and within reach: she lunges for you
     const d = Math.hypot(g.pos.x - runtime.eye.x, g.pos.z - runtime.eye.z);
     c.scare = g.mode === 'hunt' && g.visible ? THREE.MathUtils.clamp(1 - (d - 1.2) / 4, 0, 1) : 0;
+    if (pose) {
+      c.scare = pose.scare;
+      c.speed = pose.speed;
+      c.stunned = pose.stunned;
+    }
   });
   return (
     <group ref={group} visible={false} userData={{ warm: true }}>

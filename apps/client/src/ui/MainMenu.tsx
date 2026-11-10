@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { audio } from '../audio/engine';
 import { music } from '../audio/music';
 import { hasReconnectToken } from '../game/net';
+import { runtime } from '../game/runtime';
 import { useApp } from '../state/store';
 import { MenuCanvas } from '../three/GameScene';
 import { click, TapeLines } from './common';
@@ -23,6 +24,14 @@ export function MainMenu() {
     go(prologue ? 'prologue' : 'loading');
   };
   const seen = profile.story.prologueDone;
+  // testing mode (dev builds only): straight into the station with the Studio panel open
+  const studio = () => {
+    runtime.studio.on = true;
+    playSolo(false);
+  };
+  useEffect(() => {
+    if (import.meta.env.DEV && new URLSearchParams(location.search).has('studio') && !runtime.studio.on) studio();
+  }, []);
 
   const items: { label: string; sub: string; act: () => void }[] = [
     seen
@@ -36,6 +45,7 @@ export function MainMenu() {
     { label: 'Unlocks & Progression', sub: `${profile.achievements.length} achievements · ${profile.collectibles.length} fragments`, act: () => go('unlocks') },
     { label: 'Settings', sub: 'Audio · graphics · accessibility', act: () => openSettings('menu') },
     { label: 'Credits', sub: '', act: () => go('credits') },
+    ...(import.meta.env.DEV ? [{ label: 'Testing Studio', sub: 'Dev only · jump to any step, view the Caller, cutscenes, notes', act: studio }] : []),
   ];
 
   useEffect(() => {

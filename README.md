@@ -149,6 +149,8 @@ apps/client         Vite + React 19 + React Three Fiber 9 + Rapier 2 + postproce
 | Command | What it does |
 |---|---|
 | `npm run dev` | Client dev server on :5173 |
+| `npm run studio` | Dev server, opened straight into the **Testing Studio** |
+| `npm run ship` | Push `main` and publish it to production (GitHub Pages). Nothing ships without this |
 | `npm run dev:server` | Multiplayer server on :2567 (auto-reload) |
 | `npm test` | All tests (shared + client + server) |
 | `npm run typecheck` | TypeScript across all packages |
@@ -157,10 +159,23 @@ apps/client         Vite + React 19 + React Three Fiber 9 + Rapier 2 + postproce
 
 ---
 
+## Testing mode and production
+
+There are two modes, and they never mix:
+
+- **Testing mode** is the dev server (`npm run studio`, or http://localhost:5173/?studio, or *Testing Studio* in the dev menu). It drops you straight into the station with the **Testing Studio** panel open (press <kbd>`</kbd> to hide or show it; the game doesn't pause while it's open):
+  - **Steps:** jump to the start of any of the seven steps. Every earlier step is done for you (flashlight, key, reels, power, code, doors) and you stand next to where that step happens.
+  - **Story:** play any task cutscene, show any story card, or play the cassette prologue.
+  - **Ghost:** pin the Caller in front of you and pose her (lunge and reach, hair speed, turn, stunned), fire a jump scare, start or end a hunt, *Calm* (she never hunts) and *God mode* (she can't take you).
+  - **World:** free camera (WASD + mouse, Shift fast, Space up, C down: click the view to steer), freeze the world, teleport to any room or object.
+  - **Look:** graphics tier, FPS meter, hide the HUD for clean views.
+  - **Notes:** write what should change. Each note is saved with where you were, what you were looking at and a screenshot in `studio-notes/` (git-ignored). Then ask Claude to "apply my studio notes".
+- **Production** is the published site, https://spandragon98.github.io/Nishi-game/. Pushing to `main` does **not** publish anything. Production only changes when you run `npm run ship` (or press *Run workflow* on the *Deploy to GitHub Pages* action). The Studio only exists in dev builds: the production bundle doesn't contain it.
+
 ## Deployment
 
 ### GitHub Pages (story mode)
-`.github/workflows/deploy.yml` tests, builds and publishes the game to GitHub Pages on every push to `main`. That build sets `VITE_SOLO_ONLY=1`, which removes Multiplayer from the menu, because Pages only serves static files. Asset paths are relative (`base: './'`), so the build works from the `/<repo>/` subfolder.
+`.github/workflows/deploy.yml` tests, builds and publishes the game to GitHub Pages, only when started by hand (`npm run ship`). That build sets `VITE_SOLO_ONLY=1`, which removes Multiplayer from the menu, because Pages only serves static files. Asset paths are relative (`base: './'`), so the build works from the `/<repo>/` subfolder.
 
 ### Frontend (static hosting)
 1. Set the server URL at build time: `VITE_SERVER_URL=wss://your-game-server.example.com` (see `apps/client/.env.example`).
