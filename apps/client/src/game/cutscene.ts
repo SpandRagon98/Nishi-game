@@ -216,7 +216,7 @@ function storyboard(id: ObjectiveId, me: SurvivorView, level: LevelDef, snap?: W
     }
     case 'power': {
       // the fuse box; the platform waking up a light at a time; at its far end, under the last tube,
-      // she is waiting. The tube above her dies. And then she is in front of the lens.
+      // she is waiting, barely there. The tube above her stutters, and when it steadies she is gone.
       const fuse = at('fuse_box') ?? V(25, 1.5, -13.6);
       const her = V(15, 0, 3.6);
       const lens = V(28.4, 1.75, 4.5);
@@ -231,20 +231,18 @@ function storyboard(id: ObjectiveId, me: SurvivorView, level: LevelDef, snap?: W
           cues: [[0, () => (fx.powerOnAt = now())]],
         },
         {
-          d: 3.2,
+          d: 4,
           cam: [V(30, 1.8, 4.6), lens.clone()],
           look: [her.clone().setY(1.45), her.clone().setY(1.4)],
-          fov: [20, 15],
+          fov: [20, 16],
           hand: 0.12,
           cues: [
-            [0, () => addApparition(her, yawTo(her, lens), 3.4, 'apparition', false, { still: true })],
+            [0, () => addApparition(her, yawTo(her, lens), 2.9, 'apparition', false, { still: true })],
             [1.9, () => {
               for (const l of level.lights) if (l.pos && Math.hypot(l.pos.x - her.x, l.pos.z - her.z) < 9) fx.flicker.set(l.id, now() + 1.6);
             }],
           ],
         },
-        // a hard cut on the same lens: she is no longer down there, she is here
-        scare(lens.clone().setY(1.55), her.clone().sub(lens).setY(0)),
       ];
     }
     case 'decode': {

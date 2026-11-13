@@ -731,34 +731,98 @@ class AudioEngine {
 
   footstep(surface: Surface, pos: Vec3, loud: number, remote = false) {
     if (!this.ctx) return;
-    const t = this.ctx.currentTime + Math.random() * 0.01;
+    const t = this.ctx.currentTime + Math.random() * 0.008;
     const dest = this.out('effects', remote ? pos : undefined);
-    const v = (remote ? 0.9 : 0.35) * loud;
+    // loud is 0.35 creeping, 0.8 walking, 1.3 running
+    this.step(surface, t, (remote ? 0.9 : 0.35) * loud, loud < 0.5 ? 0 : loud > 1 ? 2 : 1, dest);
+  }
+
+  /** which foot lands next: one always lands a touch heavier than the other */
+  private foot = 0;
+
+  /** noise through a filter that sweeps from f0 to f1 as it dies: a scuff, a tap, a crunch */
+  private sweep(t: number, dur: number, peak: number, type: BiquadFilterType, f0: number, f1: number, q: number, dest: AudioNode, brown = false, attack = 0.002) {
+    const ctx = this.ctx!;
+    const s = this.noiseSrc(false, brown);
+    const f = ctx.createBiquadFilter();
+    f.type = type;
+    f.Q.value = q;
+    f.frequency.setValueAtTime(f0, t);
+    f.frequency.exponentialRampToValueAtTime(f1, t + attack + dur);
+    const g = ctx.createGain();
+    this.envelope(g, t, attack, peak, dur);
+    s.connect(f).connect(g).connect(dest);
+    s.start(t, Math.random() * 1.5);
+    s.stop(t + attack + dur + 0.05);
+  }
+
+  /**
+   * One footfall in shoes: the heel strikes, the sole rolls, the toe pushes off. Each part is shaped
+   * noise (no pitched tones), every step a little different. gait: 0 creeping, 1 walking, 2 running.
+   */
+  private step(surface: Surface, t: number, v: number, gait: number, dest: AudioNode) {
+    const r = (a: number, b: number) => a + Math.random() * (b - a);
+    this.foot ^= 1;
+    v *= (this.foot ? 1 : 0.86) * r(0.82, 1.1);
+    // creeping puts the toe down first and the heel barely; running slaps the whole sole at once
+    const roll = gait === 2 ? r(0.03, 0.045) : gait === 0 ? r(0.12, 0.16) : r(0.075, 0.1);
+    const heel = v * (gait === 0 ? 0.4 : gait === 2 ? 1.15 : 1);
+    const toe = v * (gait === 0 ? 0.75 : gait === 2 ? 0.7 : 0.5);
+    const T = t + roll;
+    // the body of every step: the dull weight of a foot coming down, felt more than heard
+    const thump = (at: number, a: number, f0 = r(280, 360)) => this.sweep(at, gait === 2 ? 0.09 : 0.07, a, 'lowpass', f0, 70, 0.6, dest, true, 0.003);
     switch (surface) {
-      case 'metal':
-        this.burst(t, 0.06, v * 0.6, { type: 'bandpass', f: 1800, q: 2 }, dest);
-        this.tone(620 + Math.random() * 300, 'triangle', t, 0.002, v * 0.12, 0.25, dest);
-        this.tone(1390 + Math.random() * 200, 'sine', t, 0.002, v * 0.05, 0.35, dest);
+      case 'metal': {
+        // a steel plate: a hard tap, and a short dull ring that the sole damps at once
+        thump(t, heel * 0.7);
+        this.sweep(t, 0.03, heel * 0.42, 'bandpass', r(2600, 3200), 1500, 1.6, dest);
+        const f = r(330, 420);
+        for (const [m, a, d] of [[1, 0.06, 0.22], [2.76, 0.035, 0.16], [5.4, 0.018, 0.1]] as const) this.tone(f * m, 'sine', t, 0.001, heel * a, d * (gait === 2 ? 1.3 : 1), dest, r(-12, 12));
+        this.sweep(T, 0.025, toe * 0.35, 'bandpass', r(2200, 2800), 1400, 1.6, dest);
         break;
-      case 'wood':
-        this.tone(110 + Math.random() * 20, 'sine', t, 0.004, v * 0.6, 0.09, dest);
-        this.burst(t, 0.05, v * 0.4, { type: 'bandpass', f: 700, q: 1.2 }, dest);
+      }
+      case 'wood': {
+        // boards: a hollow knock, the floor's own low resonance, now and then a creak underfoot
+        thump(t, heel * 1.1, r(220, 280));
+        this.sweep(t, 0.12, heel * 0.4, 'bandpass', r(170, 210), 140, 5, dest, true);
+        this.sweep(t, 0.03, heel * 0.25, 'bandpass', r(900, 1200), 600, 1.2, dest);
+        this.sweep(T, 0.05, toe * 0.4, 'bandpass', r(500, 700), 300, 1.4, dest);
+        if (Math.random() < 0.14) this.sweep(T + 0.02, r(0.15, 0.25), v * 0.1, 'bandpass', r(500, 800), r(400, 900), 14, dest, false, 0.04);
         break;
-      case 'gravel':
-        for (let i = 0; i < 4; i++) this.burst(t + i * 0.012, 0.03, v * 0.35, { type: 'highpass', f: 2500 + Math.random() * 2000 }, dest);
-        this.burst(t, 0.08, v * 0.3, { type: 'bandpass', f: 600 }, dest);
+      }
+      case 'gravel': {
+        // stones shifting under the sole: a spray of tiny grains around the heel and the toe
+        thump(t, heel * 0.55);
+        this.sweep(t, 0.12 + roll, heel * 0.3, 'bandpass', 1100, 450, 0.9, dest, false, 0.01);
+        for (let i = 0; i < (gait === 2 ? 9 : 7); i++) {
+          const at = t + Math.random() * (roll + 0.07);
+          this.sweep(at, r(0.006, 0.018), v * r(0.12, 0.3), 'highpass', r(2200, 5200), 1800, 0.7, dest, false, 0.001);
+        }
         break;
-      case 'water':
-        this.burst(t, 0.12, v * 0.5, { type: 'highpass', f: 1800 }, dest);
-        this.burst(t + 0.02, 0.18, v * 0.25, { type: 'bandpass', f: 500, q: 3 }, dest);
+      }
+      case 'water': {
+        // a puddle: the slap, the splash thrown up, the drip back
+        thump(t, heel * 0.6);
+        this.sweep(t, 0.1, heel * 0.42, 'bandpass', 900, r(2200, 3000), 1.1, dest, false, 0.004);
+        this.sweep(T, 0.16, toe * 0.3, 'highpass', 2400, 3800, 0.7, dest, false, 0.01);
+        for (let i = 0; i < 2; i++) this.sweep(T + r(0.06, 0.18), 0.02, v * 0.07, 'bandpass', r(1800, 3200), r(2400, 4000), 9, dest);
         break;
-      case 'tile':
-        this.burst(t, 0.045, v * 0.55, { type: 'bandpass', f: 2600, q: 1.5 }, dest);
-        this.tone(180, 'sine', t, 0.003, v * 0.25, 0.05, dest);
+      }
+      case 'tile': {
+        // a hard glazed floor: a crisp clack of the heel, a lighter one of the toe
+        thump(t, heel * 0.6);
+        this.sweep(t, 0.02, heel * 0.5, 'bandpass', r(3200, 3800), 2200, 2, dest, false, 0.001);
+        this.sweep(T, 0.018, toe * 0.32, 'bandpass', r(2800, 3400), 2000, 2, dest, false, 0.001);
         break;
-      default:
-        this.burst(t, 0.06, v * 0.55, { type: 'bandpass', f: 1100, q: 1 }, dest);
-        this.tone(95, 'sine', t, 0.004, v * 0.3, 0.07, dest);
+      }
+      default: {
+        // gritty platform concrete: the heel's tap, the grit under the sole, and the scuff of pushing off
+        thump(t, heel);
+        this.sweep(t, 0.028, heel * 0.32, 'bandpass', r(1900, 2500), 1100, 1.1, dest, false, 0.0015);
+        this.sweep(t + 0.01, 0.04, heel * 0.12, 'highpass', r(3800, 4800), 3000, 0.7, dest);
+        thump(T, toe * 0.45, r(380, 450));
+        this.sweep(T, gait === 2 ? 0.09 : 0.06, toe * (gait === 2 ? 0.32 : 0.22), 'bandpass', r(1400, 1800), 650, 0.9, dest, false, 0.008);
+      }
     }
   }
 
@@ -869,11 +933,8 @@ class AudioEngine {
         }
         break;
       case 'footsteps':
-        for (let i = 0; i < 6; i++) {
-          const st = t + i * 0.55 + Math.random() * 0.05;
-          this.tone(85, 'sine', st, 0.004, 0.35, 0.09, dest);
-          this.burst(st, 0.06, 0.35, { type: 'bandpass', f: 1000 }, dest);
-        }
+        // someone unseen walking slowly on the concrete
+        for (let i = 0; i < 6; i++) this.step('concrete', t + i * 0.62 + Math.random() * 0.05, 0.5, 1, dest);
         break;
       case 'train_creak': {
         const o = ctx.createOscillator();

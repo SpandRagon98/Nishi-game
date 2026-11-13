@@ -71,6 +71,7 @@ export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> 
   const phone = useRef<THREE.Group>(null);
   const torchModel = useRef<THREE.Group>(null);
   const lens = useRef<THREE.MeshStandardMaterial>(null);
+  const bezel = useRef<THREE.MeshStandardMaterial>(null);
   /** which one is in hand, and the 0→1 dip of a swap in progress */
   const swap = useRef({ strong: false, k: 1 });
 
@@ -86,7 +87,8 @@ export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> 
     const ty = Math.abs(Math.cos(t.current)) * (s.moving ? 0.01 : 0.002) * shake + (s.sprinting ? 0.03 : 0);
     sway.current.x = THREE.MathUtils.damp(sway.current.x, tx, 10, dt);
     sway.current.y = THREE.MathUtils.damp(sway.current.y, ty, 10, dt);
-    lag.current.slerp(camera.quaternion, 1 - Math.exp(-12 * dt));
+    // a firm grip: the light trails a fast turn only slightly, so it never seems to drift on its own
+    lag.current.slerp(camera.quaternion, 1 - Math.exp(-20 * dt));
     g.quaternion.copy(lag.current);
     // swapping: the one in hand drops out of view, the other rises into it
     const sw = swap.current;
@@ -102,6 +104,7 @@ export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> 
     g.position.copy(camera.position).add(offset);
     if (led.current) led.current.emissiveIntensity = s.on ? 4 * s.intensity : 0;
     if (lens.current) lens.current.emissiveIntensity = s.on ? 6 * s.intensity : 0;
+    if (bezel.current) bezel.current.emissiveIntensity = s.on ? 0.22 * s.intensity : 0;
     if (s.on !== lastOn.current) {
       lastOn.current = s.on;
       screen.draw(s.on);
@@ -126,8 +129,9 @@ export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> 
           <meshStandardMaterial ref={led} color="#ffffff" emissive="#fff6e8" emissiveIntensity={0} />
         </mesh>
       </group>
-      {/* the emergency-kit flashlight: knurled black barrel, wide head, lens towards the dark */}
-      <group ref={torchModel} visible={false} userData={{ warm: true }} position={[0.01, 0.125, 0.0]} rotation={[0.1, 0.16, 0]}>
+      {/* the emergency-kit flashlight, held low and close: only its head and the front of the barrel come
+          into the corner of the view, the rest (and the hand on it) stays below the frame */}
+      <group ref={torchModel} visible={false} userData={{ warm: true }} position={[0.0, 0.1, 0.13]} rotation={[0.26, 0.16, 0]}>
         <group rotation={[-Math.PI / 2, 0, 0]}>
           <mesh position={[0, -0.03, 0]}>
             <cylinderGeometry args={[0.017, 0.017, 0.15, 14]} />
@@ -135,7 +139,12 @@ export function HeldLight({ state }: { state: React.MutableRefObject<HeldState> 
           </mesh>
           <mesh position={[0, 0.07, 0]}>
             <cylinderGeometry args={[0.027, 0.018, 0.05, 16]} />
-            <meshStandardMaterial color="#2a2b2d" roughness={0.35} metalness={0.8} />
+            <meshStandardMaterial color="#3a3c40" roughness={0.4} metalness={0.5} />
+          </mesh>
+          {/* the bezel: a thin rim round the lens that catches its own light, so the head reads in the dark */}
+          <mesh position={[0, 0.0952, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.0272, 0.0026, 6, 24]} />
+            <meshStandardMaterial ref={bezel} color="#6a665e" roughness={0.3} metalness={0.7} emissive="#ffe2b8" emissiveIntensity={0} />
           </mesh>
           <mesh position={[0, 0.02, 0.017]}>
             <boxGeometry args={[0.012, 0.025, 0.006]} />
