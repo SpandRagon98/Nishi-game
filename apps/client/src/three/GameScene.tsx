@@ -137,6 +137,16 @@ function Warmup({ post }: { post: boolean }) {
   return null;
 }
 
+/** while Aditi's ending cutscene plays over the game, the station stops drawing (two scenes would halve the frame rate) */
+function HoldForEnding() {
+  const ending = useApp((s) => s.overlay === 'ending');
+  const setFrameloop = useThree((s) => s.setFrameloop);
+  useEffect(() => {
+    setFrameloop(ending ? 'never' : 'always');
+  }, [ending, setFrameloop]);
+  return null;
+}
+
 export function GameCanvas({ session }: { session: GameSession }) {
   const graphics = useApp((s) => s.settings.graphics);
   const gp = graphicsProfile(graphics);
@@ -188,6 +198,7 @@ export function GameCanvas({ session }: { session: GameSession }) {
         <Warmup post={gp.post} />
         <PerfGovernor profile={gp} />
       </Suspense>
+      <HoldForEnding />
     </Canvas>
   );
 }

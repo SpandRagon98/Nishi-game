@@ -6,7 +6,7 @@ import { profileRepository } from './profile';
 import { loadSettings, saveSettings, type Settings } from './settings';
 
 export type Screen = 'menu' | 'prologue' | 'characters' | 'chapters' | 'unlocks' | 'settings' | 'credits' | 'lobby' | 'loading' | 'game';
-export type Overlay = null | 'pause' | 'journal' | 'doc' | 'fuse' | 'keypad' | 'chat' | 'end';
+export type Overlay = null | 'pause' | 'journal' | 'doc' | 'fuse' | 'keypad' | 'chat' | 'ending' | 'end';
 
 export interface Subtitle {
   id: number;

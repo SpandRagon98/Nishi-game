@@ -668,11 +668,15 @@ function EndScreen({ session }: { session: GameSession }) {
 }
 
 // the testing Studio exists only in dev builds: in production this is null and the import is dropped
+// Aditi's ending cutscene: its own chunk, loaded only when she escapes
+const Ending = lazy(() => import('../cine/notalone/Ending').then((m) => ({ default: m.Ending })));
+
 const Studio = import.meta.env.DEV ? lazy(() => import('../studio/Studio').then((m) => ({ default: m.Studio }))) : null;
 
 export function GameView() {
   const session = useApp((s) => s.session);
   const overlay = useApp((s) => s.overlay);
+  const graphics = useApp((s) => s.settings.graphics);
   // event routing lives at the DOM layer so it works even before the 3D canvas has mounted
   useEffect(() => (session ? session.onEvent((e) => handleSimEvent(e, session)) : undefined), [session]);
   // multiplayer: follow the room back to the lobby even if the end screen was never shown
@@ -714,7 +718,7 @@ export function GameView() {
   }, [sceneReady, session]);
   if (!session) return null;
   return (
-    <div className="game">
+    <div className={`game${overlay === 'ending' ? ' playing-ending' : ''}`}>
       {!sceneReady && <div className="scene-cover"><span>Threading the tape…</span></div>}
       <GameCanvas key={session instanceof LocalSession ? session.sim.seed : session.localId} session={session} />
       {session.role === 'ghost' ? <GhostHud /> : <SurvivorHud />}
@@ -730,6 +734,11 @@ export function GameView() {
       {overlay === 'keypad' && <Keypad session={session} />}
       {overlay === 'chat' && <ChatBox session={session} />}
       {overlay === 'pause' && <PauseMenu session={session} />}
+      {overlay === 'ending' && (
+        <Suspense fallback={<div className="cine cine-ending" />}>
+          <Ending lite={TOUCH || graphics === 'low'} onDone={() => useApp.getState().setOverlay('end')} />
+        </Suspense>
+      )}
       {overlay === 'end' && <EndScreen session={session} />}
       {Studio && runtime.studio.on && session instanceof LocalSession && (
         <Suspense fallback={null}>

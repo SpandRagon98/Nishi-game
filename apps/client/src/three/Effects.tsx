@@ -8,7 +8,7 @@ import * as THREE from 'three';
  * shadows, warm sodium-fluorescent highlights, a faint green cast in the mids like old tubes on tile),
  * and a filmic contrast curve that keeps the mids readable while the blacks go deep.
  */
-class GradeEffect extends Effect {
+export class GradeEffect extends Effect {
   constructor() {
     super(
       'Grade',

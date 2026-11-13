@@ -274,6 +274,9 @@ input[type='range'] { accent-color: var(--crimson-hi); width: 100%; }
 
 /* in-game HUD */
 .game { background: #000; }
+/* Aditi's ending plays over the game: the station's canvas and HUD are hidden (and the canvas stops drawing) */
+.game.playing-ending > :not(.cine) { visibility: hidden !important; }
+.cine-ending { z-index: 60; }
 .hud { position: absolute; inset: 0; pointer-events: none; z-index: 5; font-family: var(--mono); }
 .hud-tl { position: absolute; top: 26px; left: 30px; max-width: 420px; }
 .hud-objective { font-family: var(--serif); font-size: 20px; color: var(--bone); margin-top: 4px; text-shadow: 0 1px 8px #000; }

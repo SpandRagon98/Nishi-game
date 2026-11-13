@@ -11,3 +11,6 @@ studio-notes/
 
 # Python caches from the voice tools
 __pycache__/
+
+# Downloaded 3D models for the cutscene preview (third-party licences; kept out of the repo)
+apps/client/src/cine/notalone/models/

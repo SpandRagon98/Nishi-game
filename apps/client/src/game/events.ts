@@ -171,6 +171,8 @@ function finishMatch(summary: Extract<SimEvent, { type: 'match_end' }>['result']
   };
   const progression = applyMatchResult(s.profile, result);
   s.updateProfile(() => progression.profile);
-  // a moment for the capture / escape to land before the screen appears
-  setTimeout(() => useApp.setState({ end: { summary, progression, won }, overlay: 'end' }), won ? 1200 : 2200);
+  // a moment for the capture / escape to land before the screen appears; when Aditi gets out, her
+  // ending ("You're Not Alone") plays first, then the end screen
+  const ending = won && role !== 'ghost' && result.characterId === 'aditi';
+  setTimeout(() => useApp.setState({ end: { summary, progression, won }, overlay: ending ? 'ending' : 'end' }), won ? 1200 : 2200);
 }
